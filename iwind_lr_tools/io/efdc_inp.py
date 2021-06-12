@@ -5,6 +5,7 @@ from io import StringIO
 from typing import List
 
 from .utils import path_to_text
+from .common import Node, DataFrameNode, CommentNode, _read_csv_from_row_list
 from collections import OrderedDict
 
 card_info_dsl = """
@@ -34,72 +35,7 @@ for row in card_info_dsl.split("\n"):
     headers_map[rl[0]] = rl[1:]
 
 
-class Node:
-    @staticmethod
-    def from_str_list(str_list: List[str]):
-        raise NotImplementedError
-        
-    def to_str_list(self) -> List[str]:
-        raise NotImplementedError
 
-    @staticmethod
-    def from_str(_str: str):
-        return Node.from_str_list(_str.split("\n"))
-        
-    def to_str(self) -> str:
-        return "\n".join(self.to_str_list())
-    
-    def __str__(self):
-        return f"{self.__class__}:\n {self.obj.__str__()}" 
-    
-    def __repr__(self):
-        return f"{self.__class__}:\n {self.obj.__repr__()}" 
-
-class CommentNode(Node):
-    def __init__(self, comment_list: List[str]):
-        self.obj = comment_list
-        
-    @staticmethod
-    def from_str_list(str_list: List[str]):
-        return CommentNode(str_list)
-    
-    def to_str_list(self) -> List[str]:
-        return self.obj
-
-def _read_csv_from_row_list(row_list):
-    return pd.read_csv(StringIO("\n".join(row_list)), header=None, delim_whitespace=True)
-
-class DataFrameNode(Node):
-    def __init__(self, df):
-        self.obj = df
-    
-    @staticmethod
-    def from_str_list(str_list: List[str]):
-        """
-        if len(str_list) == 1 and str_list[0] == "":
-            return DataFrameNode(None) # "empty" dataframe
-        """
-        return DataFrameNode(_read_csv_from_row_list(str_list))
-    
-    def to_str(self):
-        """
-        if self.obj is None:
-            return ""
-        """
-        buf = StringIO()
-        self.obj.to_csv(buf, header=False, sep=" ", index=False)
-        buf.seek(0)
-        text = buf.read()
-        if len(text) > 0:
-            assert text[-1] == "\n"
-            text = text[:-1]
-        return text[:-1]
-
-    def set_header(self, header):
-        self.obj.columns = header
-
-    def get_df(self) -> pd.DataFrame:
-        return self.obj
     
 class ParserState(Enum):
     begin = 0
@@ -186,12 +122,10 @@ def parse(text:str):
     node_list = pre_parse(text)
     return list(post_parse(node_list))
 
+
 def get_df_node_map(node_list: List[Node]):
     # get a "view" for node list to help navigation and select desired object.
     dataframe_node_list = [node for node in node_list if isinstance(node, DataFrameNode)]
     df_node_map = {k: node for k, node in zip(headers_map, dataframe_node_list)}
     return df_node_map
-
-def dumps(node_list: List[Node]):
-    return "\n".join(node.to_str() for node in node_list)
 

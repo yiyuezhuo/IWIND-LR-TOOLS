@@ -11,7 +11,7 @@ wqpsc_header_txt = wqpsc_header_txt1 + " " + wqpsc_header_txt2
 wqpsc_header = wqpsc_header_txt.split()
 
 
-def parse_wqpsc_inp(p):
+def parse(p):
     with open(p, encoding="utf8") as f:
         lines = f.readlines()
 

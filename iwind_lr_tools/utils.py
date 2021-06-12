@@ -23,6 +23,19 @@ def get_exe_p(root: str):
     exe_p = exe_p_list[0]
     return exe_p
 
-def run_simulation(root: str):
+def run_simulation(root: str, popen=False):
     exe_p = get_exe_p(root)
-    return subprocess.run(str(exe_p), cwd=str(root))
+    command = str(exe_p)
+    cwd = str(root)
+    if popen:
+        return subprocess.Popen(command, cwd=cwd)
+    return subprocess.run(command, cwd=cwd)
+
+def open_safe(path, mode, **kwargs):
+    # Prevent symbolic link occastionally rewrite to the orignal file
+    assert mode in {"w", "wb"}
+    p = Path(path)
+    if p.exists():
+        p.unlink()
+    return open(p, mode, **kwargs)
+

@@ -1,5 +1,6 @@
-
-# This module provide both function which should be called from REPL and a CLI based on clize
+"""
+This module provide both function which should be called from REPL and a CLI based on clize
+"""
 
 from pathlib import Path
 import shutil

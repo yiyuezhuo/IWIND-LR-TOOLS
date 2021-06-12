@@ -1,5 +1,5 @@
 
-from setuptools import setup, find_packages
+from setuptools import setup #, find_packages
 
 with open("requirements.txt") as f:
     install_requires = f.read().splitlines()
@@ -7,11 +7,11 @@ with open("requirements.txt") as f:
 
 setup(
     name='IWIND-LR-TOOLS',
-    version='0.0.1',
+    version='0.0.2',
     url='https://github.com/yiyuezhuo/IWIND-LR-TOOLS.git',
     author='yiyuezhuo',
     author_email='yiyuezhuo@gmail.com',
     description='Tools to create, manipuate and analyze IWIND-LR input and output file.',
-    packages=find_packages(),    
+    packages=["iwind_lr_tools"],    
     install_requires=install_requires,
 )
