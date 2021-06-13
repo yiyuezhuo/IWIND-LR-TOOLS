@@ -48,14 +48,33 @@ Changes in source will reflect on the session in real time.
 
 ## Test
 
-Example:
+### Enviroment variables:
+
+* `WATER_ROOT`: An environment variable which points to a "reference" Input folder.
+* `WATER_EFDC_FAST`: An environment variable which points to a "fast" efdc.inp file (ex: simulation time is 1 day rather than 100+) . This file will override `WATER_ROOT` version in a new directory.
+
 
 ```shell
-nosetests tests/projection_test_fast.py
+pytest
 ```
 
-To start pdb when error is raised:
+Test To start pdb when error is raised:
 
 ```shell
-nosetests tests/projection_test_fast.py:TestProjection.test_more_1_day_sanity_check --pdb
+pytest tests/test_projection_fast.py:TestProjection.test_more_1_day_sanity_check --pdb
 ```
+
+To obtain coverage report:
+
+```shell
+coverage run -m pytest
+coverage report -m
+```
+
+HTML version:
+
+```shell
+coverage html
+```
+
+Check `htmlcov/index.html`.

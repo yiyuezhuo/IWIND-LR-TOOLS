@@ -14,6 +14,8 @@ from pathlib import Path
 
 from iwind_lr_tools import create_simulation, run_simulation, efdc_inp, qser_inp, dumps
 from iwind_lr_tools.utils import open_safe
+from iwind_lr_tools import Actioner, Runner
+from iwind_lr_tools.collector import get_all
 
 ori_root = os.environ["WATER_ROOT"]
 efdc_fast = os.environ["WATER_EFDC_FAST"]
@@ -100,4 +102,39 @@ class TestProjection(unittest.TestCase):
             self.file_eq(root / "WQWCTS.out", target_root / "WQWCTS.out", eq=False)
 
 
+class TestEnvrionmentIsolation(unittest.TestCase):
+    def test_environment_isolation(self):
+        given_simulation_length = 1.1
 
+        root = Path(ori_root)
+        data_map, df_map_map = get_all(root)
+        actioner = Actioner(data_map, df_map_map)
+        actioner.set_simulation_length(given_simulation_length)
+
+        self.assertEqual(actioner.get_simulation_length(), given_simulation_length)
+        self.assertEqual(df_map_map["efdc.inp"]["C03"]["NTC"].iloc[0], given_simulation_length)
+
+        date_map = {p: p.stat().st_mtime for p in root.iterdir()}
+        runner = Runner(root) # a temp path will be created
+        runner.run(efdc_node_list=data_map["efdc.inp"], qser_node_list=None)
+        for p in root.iterdir():
+            self.assertEqual(p.stat().st_mtime, date_map[p])
+        
+        efdc_new_time = (runner.dst_root / "efdc.inp").stat().st_mtime
+        efdc_old_time = (root / "efdc.inp").stat().st_mtime
+
+        qser_new_time = (runner.dst_root / "qser.inp").stat().st_mtime
+        qser_old_time = (root / "qser.inp").stat().st_mtime
+        
+        self.assertGreater(efdc_new_time, efdc_old_time)
+        self.assertEqual(qser_new_time, qser_old_time)
+
+        runner.write(efdc_node_list=data_map["efdc.inp"], qser_node_list=data_map["qser.inp"])
+
+        qser_new_time = (runner.dst_root / "qser.inp").stat().st_mtime
+
+        self.assertGreater(qser_new_time, qser_old_time)
+
+
+
+        

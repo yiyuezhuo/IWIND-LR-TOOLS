@@ -44,7 +44,7 @@ class Actioner:
         
         n = C08.shape[0]
         C07 = self.df_map_map["efdc.inp"]["C07"]
-        C07["NTSER"].iloc[0] = n
+        C07["NQSIJ"].iloc[0] = n
         C07["NQSER"].iloc[0] = n
 
     def set_flow(self, C08:pd.DataFrame, C09:pd.DataFrame, flow_node_list: List[FlowNode]):

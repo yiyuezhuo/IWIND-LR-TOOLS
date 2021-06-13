@@ -41,7 +41,8 @@ class Runner:
     def parse_out(self):
         return parse_out(self.dst_root)
 
-    def run(self, *, efdc_node_list: List[Node]=None, qser_node_list: List[Node]=None, popen=False):
+    def run(self, *, efdc_node_list: List[Node], qser_node_list: List[Node], popen=False):
+        # If efdc_node_list or qser_node_list takes None, the value will not be changed.
         self.write(efdc_node_list=efdc_node_list, qser_node_list=qser_node_list)
         self.run_simulation(popen=popen)
         return self.parse_out()

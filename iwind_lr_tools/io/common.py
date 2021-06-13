@@ -55,6 +55,10 @@ class DataFrameNode(Node):
             return DataFrameNode(None) # "empty" dataframe
         """
         return DataFrameNode(_read_csv_from_row_list(str_list))
+
+    @staticmethod
+    def from_dataframe(df: pd.DataFrame):
+        return DataFrameNode(df)
     
     def to_str(self):
         """

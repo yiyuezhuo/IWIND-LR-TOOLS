@@ -1,12 +1,11 @@
-from pathlib import Path
-from enum import Enum
+
+from collections import OrderedDict
 import pandas as pd
-from io import StringIO
 from typing import List
 
-from .utils import path_to_text
-from .common import Node, DataFrameNode, CommentNode, _read_csv_from_row_list #, NodeListSuit
-from collections import OrderedDict
+from .utils import path_to_lines
+from .common import Node, DataFrameNode, CommentNode
+
 
 card_info_dsl = """
 C02  ISRESTI   ISDRY  ISIMTMP  ISIMWQ  ISIMDYE  TEMO  RKDYE  IASWRAD  SWRATNF   REVCHC  DABEDT  TBEDIT HTBED1 HTBED2    KBHM
@@ -34,92 +33,84 @@ for row in card_info_dsl.split("\n"):
     rl = row.split()
     headers_map[rl[0]] = rl[1:]
 
-    
-class ParserState(Enum):
-    begin = 0
-    comment = 1
-    dataframe = 2
-    
+forward_lookup_map = {
+    "C07": {
+        "NQSIJ": ["C08", "C09"],
+        "NQCTL": ["C10"],
+        "NQWR": ["C11", "C12"]
+    },
+    "C13": {
+        "NPD": ["C14"]
+    },
+    "C15": {
+        "MLTMSR": ["C16"]
+    }
+}
 
-def pre_parse(text:str):
-    state = ParserState.begin
-    
-    obj_list = []
-    comment_building = []
-    dataframe_building = []
-    for row in text.split("\n"):
-        r = row.strip()
-        if len(r) == 0 or r[0] == "#" or r[0] == "C":
-            if state == ParserState.dataframe:
-                df = DataFrameNode.from_str_list(dataframe_building)
-                obj_list.append(df)
-                dataframe_building = []
-            state = ParserState.comment
-            comment_building.append(row)
-        else:
-            if state == ParserState.comment:
-                obj_list.append(CommentNode.from_str_list(comment_building))
-                comment_building = []
-            state = ParserState.dataframe
-            dataframe_building.append(r)
-    if len(comment_building) > 0:
-        obj_list.append(comment_building)
-    if len(dataframe_building) > 0:
-        obj_list.append(_read_csv_from_row_list(dataframe_building))
+
+@path_to_lines
+def parse(lines):
+    it_lines = (line.strip() for line in lines)
+
+    df_remain = []
+    comment_remain = []
+
+    length_map = {
+        "C02": 1,
+        "C03": 1,
+        "C04": 1,
+        "C05": 1,
+        "C06": 1,
+        "C07": 1,
         
-    return obj_list
+        "C13": 1,
+        
+        "C15": 1,
+        
+        "C17": 1
+    }
 
-def post_parse(node_list:List[Node]):
-    # apply headers and fill "header only" table nodes
-    it_node = iter(node_list)
-    it_header = iter(headers_map.items())
 
-
-    def check(df, key, empty_card_name_list):
-        if df[key].iloc[0] > 0:
-            for expect_card_name in empty_card_name_list:
-                # node = next(it_node)
-                for node in it_node:
-                    if isinstance(node, CommentNode):
-                        yield node
-                    elif isinstance(node, DataFrameNode):
-                        break
-                    else:
-                        raise ValueError(f"Unexpected Node type {type(node)}: {node}")
-                card_name, header = next(it_header)
-                assert expect_card_name == card_name
-                node.set_header(header)
-                yield node
+    node_list = []
+    for key, fields in headers_map.items():
+        if length_map[key] == 0:
+            df = pd.DataFrame([], columns=fields)
+            df_node = DataFrameNode.from_dataframe(df)
+            node_list.append(df_node)
+            continue
+        for line in it_lines:
+            if len(line) == 0 or line[0] in {"#", "C"}:
+                comment_remain.append(line)
+                continue
+            df_remain.append(line)
+            if len(df_remain) == length_map[key]:
+                
+                df_node = DataFrameNode.from_str_list(df_remain)
+                comment_node = CommentNode.from_str_list(comment_remain)
+                df_remain = []
+                comment_remain = []
+                node_list.append(comment_node)
+                node_list.append(df_node)
+                
+                df_node.set_header(fields)
+                df = df_node.get_df()
+                if key in forward_lookup_map:
+                    for field, set_cards in forward_lookup_map[key].items():
+                        value = df[field].iloc[0]
+                        for set_card in set_cards:
+                            length_map[set_card] = value
+                
+                break
         else:
-            for expect_card_name in empty_card_name_list:
-                card_name, header = next(it_header)
-                assert expect_card_name == card_name
-                node = DataFrameNode(pd.DataFrame({}, columns=header))
-                yield node
+            ValueError("Unexpected reaching end of file")
+    assert len(df_remain) == 0 and len(comment_remain) == 0
+    # collect trailing comment (if any)
+    lines_trailing = list(it_lines)
+    if len(lines_trailing) > 0:
+        commend_node = CommentNode.from_str_list(lines_trailing)
+        node_list.append(commend_node)
 
-    for node in it_node:
-        if isinstance(node, CommentNode):
-            yield node
-        elif isinstance(node, DataFrameNode):
-            card_name, header = next(it_header)
-            node.set_header(header)
-            yield node
-            df = node.get_df()
-            if card_name == "C07":
-                yield from check(df, "NTSER", ["C08", "C09"])
-                yield from check(df, "NQCTL", ["C10"])
-                yield from check(df, "NQWR", ["C11", "C12"])
-            elif card_name == "C13":
-                yield from check(df, "NPD", ["C14"])
-            elif card_name == "C15":
-                yield from check(df, "MLTMSR", ["C16"])
-
-
-@path_to_text
-def parse(text:str):
-    node_list = pre_parse(text)
-    return list(post_parse(node_list))
-
+    return node_list
 
 def get_df_node_map(node_list: List[Node]):
     # get a "view" for node list to help navigation and select desired object.
@@ -129,22 +120,3 @@ def get_df_node_map(node_list: List[Node]):
 
 def get_df_map(node_list: List[Node]):
     return {k: node.get_df() for k, node in get_df_node_map(node_list).items()}
-
-"""
-class EfdcSuit(NodeListSuit):
-
-    def _get_df_node_map(self):
-        return get_df_node_map(self.node_list)
-
-    def _get_df_map(self):
-        return get_df_map(self.node_list)
-
-    @property
-    def simulation_length(self):
-        return self._df_map["C03"]["NTC"].iloc[0]
-
-    @simulation_length.setter
-    def simulation_length(self, val):
-        self._df_map["C03"]["NTC"].iloc[0] = val
-"""
-    
