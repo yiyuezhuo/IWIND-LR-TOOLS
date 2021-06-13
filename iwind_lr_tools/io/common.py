@@ -2,6 +2,12 @@ import pandas as pd
 from typing import List
 from io import StringIO
 
+def df_to_str(df, index=False, header=False, **kwargs):
+    buf = StringIO()
+    df.to_csv(buf, index=index, header=header, line_terminator="\n", **kwargs)
+    buf.seek(0)
+    return buf.read()
+
 
 class Node:
     @staticmethod
@@ -55,14 +61,18 @@ class DataFrameNode(Node):
         if self.obj is None:
             return ""
         """
+        df = self.obj
+        """
         buf = StringIO()
-        self.obj.to_csv(buf, header=False, sep=" ", index=False)
+        df.to_csv(buf, header=False, sep=" ", index=False, line_terminator="\n")
         buf.seek(0)
         text = buf.read()
+        """
+        text = df_to_str(df, sep=" ")
         if len(text) > 0:
             assert text[-1] == "\n"
             text = text[:-1]
-        return text[:-1]
+        return text
 
     def set_header(self, header):
         self.obj.columns = header
@@ -83,10 +93,10 @@ class FlowNode(Node): # qser main data
         self.df = pd.read_csv(buf, header=None, names=["time", "flow"], delim_whitespace=True)
         
         self.length = len(lines) - 2
-        self.explicit_length = int(self.spec[1]) # 0 or something like 5856
+        self.somewhat_length = int(self.spec[1]) # 0 or something like 5856
         
-        if self.explicit_length != 0:
-            assert self.explicit_length == self.length
+        # if self.somewhat_length != 0:
+        #     assert self.somewhat_length == self.length
             
         self.obj = (self.spec, self.depth_line, self.df)
             
@@ -96,13 +106,22 @@ class FlowNode(Node): # qser main data
     
     def to_str(self):
         # TODO: Is leftpad 2 tabs necessary?
+        df = self.df
+        """
         buf = StringIO()
-        self.df.to_csv(buf, index=False, sep="\t", header=False)
+        df.to_csv(buf, index=False, sep="\t", header=False, line_terminator="\n")
         buf.seek(0)
-        return "\n".join(["\t".join(self.spec), self.depth_line, buf.read()])
+        s = buf.read()
+        """
+        s = df_to_str(df, sep="\t")
+        return "\n".join(["\t".join(self.spec), self.depth_line, s])
+        
     
     def get_df(self):
         return self.df
+
+    def get_name(self):
+        return self.spec[-1]
 
 
 def dumps(node_list: List[Node]):
@@ -110,3 +129,43 @@ def dumps(node_list: List[Node]):
     All "projection" files should follow List[Node] format to prevent fragile code somewhat.
     """
     return "\n".join(node.to_str() for node in node_list)
+
+"""
+class NodeListSuit:
+    def __init__(self, node_list: List[Node]):
+        self._node_list = node_list
+        self.sync_with_node_list()
+
+    def sync_with_node_list(self):
+        if not hasattr(self, "_df_node_map"):
+            self._df_node_map = {}
+        if not hasattr(self, "_df_map"):
+            self._df_node_map = {}
+        
+        self.df_node_map.clear()
+        self.df_node_map.update(self._get_df_node_map())
+        self.df_map.clear()
+        self.df_map.update(self._get_df_map())
+
+    @property
+    def node_list(self):
+        return self._node_list
+
+    @node_list.setter
+    def node_list(self, val):
+        self._node_list.clear()
+        self._node_list.extend(val)
+        self.sync_with_node_list()
+
+    def sync_with_node_list():
+        pass
+
+    def dumps(self):
+        return dumps(self.node_list)
+
+    def _get_df_node_map(self):
+        raise NotImplementedError
+
+    def _get_df_map(self):
+        raise NotImplementedError
+"""

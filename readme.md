@@ -45,3 +45,17 @@ ipython -i -m iwind_lr_tools.some_cli_supported_module -- arg1 arg2
 ```
 
 Changes in source will reflect on the session in real time.
+
+## Test
+
+Example:
+
+```shell
+nosetests tests/projection_test_fast.py
+```
+
+To start pdb when error is raised:
+
+```shell
+nosetests tests/projection_test_fast.py:TestProjection.test_more_1_day_sanity_check --pdb
+```

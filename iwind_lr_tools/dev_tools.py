@@ -12,9 +12,11 @@ from datetime import timedelta, datetime
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from copy import deepcopy
 
-from iwind_lr_tools import create_simulation, run_simulation, dumps
+from iwind_lr_tools import create_simulation, run_simulation, dumps, Actioner, Runner
 from .collector import *
+
 
 # from .extract_non_modified_files import extract_non_modified_files
 
@@ -31,5 +33,4 @@ class Period:
 
 def zscore(x):
     return (x - x.mean()) / x.std()
-
 

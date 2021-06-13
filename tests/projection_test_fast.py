@@ -1,8 +1,8 @@
 """
-Fast version will copy original root and copy a human-written "efdc.inp" (simulate only 3 days) file
+Fast version will copy original root and copy a human-wrote "efdc.inp" (simulate only 3 days) file
 to override the original one. Then symbolic the overided one.
 Fast version is not guaranteed to be correct (though it will catch most possible errors) and 
-is able to run (a new human-written file may be required).
+is able to run (a new human- file may be required).
 """
 
 import unittest
@@ -85,6 +85,7 @@ class TestProjection(unittest.TestCase):
 
 
     def test_more_1_day_sanity_check(self):
+        # test if test can catch difference if target simulation runs for 1 day more.
         with create_environment(ori_root) as (root, target_root):
             efdc_path = target_root / "efdc.inp"
             efdc_node_list = efdc_inp.parse(efdc_path)

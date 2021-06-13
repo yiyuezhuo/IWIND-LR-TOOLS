@@ -41,6 +41,8 @@ out_map = {
     "WQWCTS.out": WQWCTS_out
 }
 
+has_df_map_list = ["efdc.inp", "qser.inp"]
+
 inp_out_map = {}
 inp_out_map.update(inp_map)
 inp_out_map.update(out_map)
@@ -51,8 +53,19 @@ def parse_map(root, map):
 def parse_inp(root):
     return parse_map(root, inp_map)
 
-def parse_outp(root):
+def parse_out(root):
     return parse_map(root, out_map)
 
 def parse_all(root):
     return parse_map(root, inp_out_map)
+
+def get_df_map_map(data_map):
+    df_map_map = {}
+    for key in has_df_map_list:
+        df_map_map[key] = inp_out_map[key].get_df_map(data_map[key])
+    return df_map_map
+
+def get_all(root):
+    data_map = parse_all(root)
+    df_map_map = get_df_map_map(data_map)
+    return data_map, df_map_map

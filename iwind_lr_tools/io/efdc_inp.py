@@ -5,7 +5,7 @@ from io import StringIO
 from typing import List
 
 from .utils import path_to_text
-from .common import Node, DataFrameNode, CommentNode, _read_csv_from_row_list
+from .common import Node, DataFrameNode, CommentNode, _read_csv_from_row_list #, NodeListSuit
 from collections import OrderedDict
 
 card_info_dsl = """
@@ -33,8 +33,6 @@ for row in card_info_dsl.split("\n"):
         continue
     rl = row.split()
     headers_map[rl[0]] = rl[1:]
-
-
 
     
 class ParserState(Enum):
@@ -129,3 +127,24 @@ def get_df_node_map(node_list: List[Node]):
     df_node_map = {k: node for k, node in zip(headers_map, dataframe_node_list)}
     return df_node_map
 
+def get_df_map(node_list: List[Node]):
+    return {k: node.get_df() for k, node in get_df_node_map(node_list).items()}
+
+"""
+class EfdcSuit(NodeListSuit):
+
+    def _get_df_node_map(self):
+        return get_df_node_map(self.node_list)
+
+    def _get_df_map(self):
+        return get_df_map(self.node_list)
+
+    @property
+    def simulation_length(self):
+        return self._df_map["C03"]["NTC"].iloc[0]
+
+    @simulation_length.setter
+    def simulation_length(self, val):
+        self._df_map["C03"]["NTC"].iloc[0] = val
+"""
+    
