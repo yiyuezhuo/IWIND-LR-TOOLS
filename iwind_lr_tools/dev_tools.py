@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from copy import deepcopy
+from multiprocessing.dummy import Pool
 
 from iwind_lr_tools import create_simulation, run_simulation, dumps, Actioner, Runner
 from .collector import *

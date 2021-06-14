@@ -27,24 +27,30 @@ class Runner:
         self.dst_root = Path(dst_root)
         create_simulation(src_root, dst_root)
 
-    def write(self, *, efdc_node_list: List[Node]=None, qser_node_list: List[Node]=None):
+    def write(self, *, efdc_node_list: List[Node], qser_node_list: List[Node],
+              wqpsc_node_list: List[Node]):
         if efdc_node_list is not None:
             with open_safe(self.dst_root / "efdc.inp", "w", encoding='utf8') as f:
                 f.write(dumps(efdc_node_list))
         if qser_node_list is not None:
             with open_safe(self.dst_root / "qser.inp", "w", encoding='utf8') as f:
                 f.write(dumps(qser_node_list))
+        if wqpsc_node_list is not None:
+            with open_safe(self.dst_root / "wqpsc.inp", "w", encoding='utf8') as f:
+                f.write(dumps(wqpsc_node_list))
     
-    def run_simulation(self, popen=False):
-        run_simulation(self.dst_root, popen=popen)
+    def run_simulation(self):
+        run_simulation(self.dst_root, popen=False)
 
     def parse_out(self):
         return parse_out(self.dst_root)
 
-    def run(self, *, efdc_node_list: List[Node], qser_node_list: List[Node], popen=False):
+    def run(self, *, efdc_node_list: List[Node], qser_node_list: List[Node], 
+            wqpsc_node_list: List[Node]):
         # If efdc_node_list or qser_node_list takes None, the value will not be changed.
-        self.write(efdc_node_list=efdc_node_list, qser_node_list=qser_node_list)
-        self.run_simulation(popen=popen)
+        self.write(efdc_node_list=efdc_node_list, qser_node_list=qser_node_list, 
+                    wqpsc_node_list=wqpsc_node_list)
+        self.run_simulation()
         return self.parse_out()
 
     def cleanup(self):

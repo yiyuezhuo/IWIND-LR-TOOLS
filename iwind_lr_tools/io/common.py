@@ -28,7 +28,9 @@ class Node:
         return f"{self.__class__}:\n {self.obj.__str__()}" 
     
     def __repr__(self):
-        return f"{self.__class__}:\n {self.obj.__repr__()}" 
+        return f"{self.__class__}:\n {self.obj.__repr__()}"
+    
+
 
 class CommentNode(Node):
     def __init__(self, comment_list: List[str]):
@@ -44,9 +46,30 @@ class CommentNode(Node):
 def _read_csv_from_row_list(row_list):
     return pd.read_csv(StringIO("\n".join(row_list)), header=None, delim_whitespace=True)
 
-class DataFrameNode(Node):
-    def __init__(self, df):
+class AbstractDataFrameNode(Node):
+    @classmethod
+    def get_df_node_list(cls, node_list: List[Node]):
+        return [node for node in node_list if isinstance(node, cls)]
+
+    @classmethod
+    def get_df_node_map(cls, node_list: List[Node]):
+        # get a "view" for node list to help navigation and select desired object.
+        flow_node_map = {node.get_name(): node for node in cls.get_df_node_list(node_list)}
+        return flow_node_map
+
+    @classmethod
+    def get_df_map(cls, node_list: List[Node]):
+        return {k: flow_node.get_df() for k, flow_node in cls.get_df_node_map(node_list).items()}
+
+    @classmethod
+    def get_helpers(cls):
+        return cls.get_df_node_list, cls.get_df_node_map, cls.get_df_map
+
+
+class DataFrameNode(AbstractDataFrameNode):
+    def __init__(self, df, name=None):
         self.obj = df
+        self._name = name
     
     @staticmethod
     def from_str_list(str_list: List[str]):
@@ -84,11 +107,20 @@ class DataFrameNode(Node):
     def get_df(self) -> pd.DataFrame:
         return self.obj
 
-class FlowNode(Node): # qser main data
+    def set_df(self, df):
+        self.obj = df
+
+    def set_name(self, name:str):
+        self._name = name
+
+    def get_name(self):
+        return self._name
+
+class FlowNode(AbstractDataFrameNode): # qser main data
     def __init__(self, lines):
         
         self.spec = lines[0].strip().split()
-        assert len(self.spec) == 8, f"wrong spec, {self.spec}"
+        assert len(self.spec) == 8, f"wrong flow spec, {self.spec}"
         self.depth_line = lines[1].strip()
         assert int(self.depth_line.strip()) == 1, f"This version assume target has only 1 depth, but found {self.depth_line}"
         
@@ -126,6 +158,41 @@ class FlowNode(Node): # qser main data
 
     def get_name(self):
         return self.spec[-1]
+
+class ConcentrationNode(AbstractDataFrameNode):
+    """
+    While we can extract some common parts from `FlowNode` and `ConcentrationNode`,
+    the benefit to do it is too small so the code is just copied and modified.
+    """
+    def __init__(self, lines, *, names):
+        self.spec = lines[0].strip().split()
+        assert len(self.spec) == 7, f"wrong concentration spec, {self.spec}"
+
+        self.table_data = lines[1:]
+
+        buf = StringIO('\n'.join(self.table_data))
+        self.df = pd.read_csv(buf, header=None, names=names, delim_whitespace=True)
+        
+        self.length = len(lines) - 1
+
+        self.obj = (self.spec, self.df)
+
+    @staticmethod
+    def from_str_list(str_list: List[str], *, names):
+        return ConcentrationNode(str_list, names=names)
+    
+    def to_str(self):
+        # TODO: Is leftpad 2 tabs necessary?
+        df = self.df
+        s = df_to_str(df, sep="\t")
+        return "\n".join(["\t".join(self.spec), s])
+        
+    def get_df(self):
+        return self.df
+
+    def get_name(self):
+        return self.spec[-1]
+
 
 
 def dumps(node_list: List[Node]):
@@ -173,3 +240,4 @@ class NodeListSuit:
     def _get_df_map(self):
         raise NotImplementedError
 """
+

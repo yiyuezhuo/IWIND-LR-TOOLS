@@ -93,6 +93,7 @@ def parse(lines):
                 node_list.append(df_node)
                 
                 df_node.set_header(fields)
+                df_node.set_name(key)
                 df = df_node.get_df()
                 if key in forward_lookup_map:
                     for field, set_cards in forward_lookup_map[key].items():
@@ -112,6 +113,10 @@ def parse(lines):
 
     return node_list
 
+# get_df_node_list, get_df_node_map, get_df_map = DataFrameNode.get_helpers()
+
+
+"""
 def get_df_node_map(node_list: List[Node]):
     # get a "view" for node list to help navigation and select desired object.
     dataframe_node_list = [node for node in node_list if isinstance(node, DataFrameNode)]
@@ -120,3 +125,5 @@ def get_df_node_map(node_list: List[Node]):
 
 def get_df_map(node_list: List[Node]):
     return {k: node.get_df() for k, node in get_df_node_map(node_list).items()}
+"""
+

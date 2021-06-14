@@ -1,12 +1,9 @@
 
 from typing import List
 
-from .utils import path_to_lines
+from .utils import path_to_lines, iter_strip
 from .common import Node, FlowNode, CommentNode #, NodeListSuit
 
-def iter_strip(lines):
-    for line in lines:
-        yield line.strip()
 
 
 @path_to_lines
@@ -42,14 +39,20 @@ def parse(lines: List[str]):
 
     return node_list
 
-def get_flow_node_map(node_list: List[Node]):
+"""
+def get_df_node_list(node_list: List[Node]):
+    return [node for node in node_list if isinstance(node, FlowNode)]
+
+def get_df_node_map(node_list: List[Node]):
     # get a "view" for node list to help navigation and select desired object.
-    flow_node_list = [node for node in node_list if isinstance(node, FlowNode)]
-    flow_node_map = {node.get_name(): node for node in flow_node_list}
+    flow_node_map = {node.get_name(): node for node in get_df_node_list(node_list)}
     return flow_node_map
 
 def get_df_map(node_list: List[Node]):
-    return {k: flow_node.get_df() for k, flow_node in get_flow_node_map(node_list).items()}
+    return {k: flow_node.get_df() for k, flow_node in get_df_node_map(node_list).items()}
+"""
+
+# get_df_node_list, get_df_node_map, get_df_map = FlowNode.get_helpers()
 
 """
 class QserSuit(NodeListSuit):

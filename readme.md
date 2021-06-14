@@ -61,7 +61,7 @@ pytest
 Test To start pdb when error is raised:
 
 ```shell
-pytest tests/test_projection_fast.py:TestProjection.test_more_1_day_sanity_check --pdb
+pytest -k "test_runner_wqpsc_node_list" --pdb
 ```
 
 To obtain coverage report:
@@ -78,3 +78,7 @@ coverage html
 ```
 
 Check `htmlcov/index.html`.
+
+## Note
+
+* It's strange that qser's `nlines` can be `0` so I am forced to check number of cell for every line to determine the shape of a dataframe.

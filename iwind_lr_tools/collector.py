@@ -2,6 +2,7 @@
 Collect interested files
 """
 
+from iwind_lr_tools.io.common import DataFrameNode, FlowNode, ConcentrationNode
 from pathlib import Path
 import pandas as pd
 from datetime import timedelta
@@ -41,7 +42,12 @@ out_map = {
     "WQWCTS.out": WQWCTS_out
 }
 
-has_df_map_list = ["efdc.inp", "qser.inp"]
+has_df_map_list = ["efdc.inp", "qser.inp", "wqpsc.inp"]
+node_cls_map = {
+    "efdc.inp": DataFrameNode,
+    "qser.inp": FlowNode,
+    "wqpsc.inp": ConcentrationNode
+}
 
 inp_out_map = {}
 inp_out_map.update(inp_map)
@@ -59,13 +65,18 @@ def parse_out(root):
 def parse_all(root):
     return parse_map(root, inp_out_map)
 
-def get_df_map_map(data_map):
+def get_df_node_map_map_and_df_map_map(data_map):
+    df_node_map_map = {}
     df_map_map = {}
     for key in has_df_map_list:
-        df_map_map[key] = inp_out_map[key].get_df_map(data_map[key])
-    return df_map_map
+        df_node_map = node_cls_map[key].get_df_node_map(data_map[key])
+        df_map = {k: v.get_df() for k, v in df_node_map.items()}
+        df_node_map_map[key] = df_node_map
+        df_map_map[key] = df_map
+    return df_node_map_map, df_map_map
 
 def get_all(root):
     data_map = parse_all(root)
-    df_map_map = get_df_map_map(data_map)
-    return data_map, df_map_map
+    df_node_map_map, df_map_map = get_df_node_map_map_and_df_map_map(data_map)
+    return data_map, df_node_map_map, df_map_map
+

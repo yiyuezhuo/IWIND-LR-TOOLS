@@ -12,3 +12,7 @@ def path_to_text(func):
             lines = f.read()
         return func(lines)
     return _func
+
+def iter_strip(lines):
+    for line in lines:
+        yield line.strip()
