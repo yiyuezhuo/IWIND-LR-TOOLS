@@ -194,6 +194,29 @@ class ConcentrationNode(AbstractDataFrameNode):
         return self.spec[-1]
 
 
+class FlowAdjustMatrixNode(Node):
+    def __init__(self, lines, *, names):
+        time_line = lines[0].strip().split()
+        assert len(time_line) == 1
+        self.time = float(time_line[0])
+        
+        self.table_data = lines[1:]
+        buf = StringIO('\n'.join(self.table_data))
+        self.df = pd.read_csv(buf, header=None, names=names, delim_whitespace=True)
+        self.obj = (self.time, self.df)
+
+    def get_df(self):
+        return self.df
+
+    @staticmethod
+    def from_str_list(str_list: List[str], *, names):
+        return FlowAdjustMatrixNode(str_list, names=names)
+
+    def to_str(self):
+        df = self.df
+        s = df_to_str(df, sep="\t")
+        return "\n".join([f"{self.time}", s])
+
 
 def dumps(node_list: List[Node]):
     """

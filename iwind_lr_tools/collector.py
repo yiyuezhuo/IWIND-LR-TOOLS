@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from datetime import timedelta
 
-from .io import aser_inp, efdc_inp, qbal_out, qser_inp, wqpsc_inp, WQWCTS_out
+from .io import aser_inp, efdc_inp, qbal_out, qser_inp, wqpsc_inp, WQWCTS_out, wq3dwc_inp, conc_adjust_inp
 
 class ModelXML:
     def __init__(self, xml_path: str):
@@ -35,6 +35,8 @@ inp_map = {
     "efdc.inp": efdc_inp,
     "qser.inp": qser_inp,
     "wqpsc.inp": wqpsc_inp,
+    "wq3dwc.inp": wq3dwc_inp,
+    "conc_adjust.inp": conc_adjust_inp
 }
 
 out_map = {
@@ -42,17 +44,25 @@ out_map = {
     "WQWCTS.out": WQWCTS_out
 }
 
-has_df_map_list = ["efdc.inp", "qser.inp", "wqpsc.inp"]
+has_df_map_list = ["efdc.inp", "qser.inp", "wqpsc.inp", "wq3dwc.inp"]
 node_cls_map = {
     "efdc.inp": DataFrameNode,
     "qser.inp": FlowNode,
-    "wqpsc.inp": ConcentrationNode
+    "wqpsc.inp": ConcentrationNode,
+    "wq3dwc.inp": DataFrameNode
+}
+
+# dependences and extra_length_map
+dep_map = {
+    "wq3dwc.inp": (["efdc.inp"], wq3dwc_inp.parse_dep),
+    "conc_adjust.inp": (["efdc.inp"], conc_adjust_inp.parse_dep)
 }
 
 inp_out_map = {}
 inp_out_map.update(inp_map)
 inp_out_map.update(out_map)
 
+"""
 def parse_map(root, map):
     return {k:v.parse(root / k) for k, v in map.items()}
 
@@ -64,6 +74,40 @@ def parse_out(root):
 
 def parse_all(root):
     return parse_map(root, inp_out_map)
+"""
+
+def parse_with_resolve(root, io_module_map, max_loop=1000):
+    data_map = {}
+    remain_list = list(io_module_map.keys())
+    for _ in range(max_loop):
+        if len(remain_list) == 0:
+            return data_map
+        
+        for key in remain_list:
+            new_remain_list = []
+            module = io_module_map[key]
+            if key not in dep_map:
+                data_map[key] = module.parse(root / key)
+            else:
+                dep_list, extra_length_map_callback = dep_map[key]
+                for dep in dep_list:
+                    if dep not in dep_list:
+                        break
+                else:
+                    kwargs = extra_length_map_callback(data_map)
+                    data_map[key] = module.parse(root / key, **kwargs)
+                    continue
+                new_remain_list.append(key)
+        remain_list = new_remain_list
+    
+    raise ValueError("max_loop reached, is resolve graph too large or circular reference appear?")
+
+def parse_all(root):
+    return parse_with_resolve(root, inp_out_map)
+
+def parse_out(root):
+    return parse_with_resolve(root, out_map)
+
 
 def get_df_node_map_map_and_df_map_map(data_map):
     df_node_map_map = {}

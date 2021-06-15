@@ -10,7 +10,8 @@ from .utils import iter_strip, path_to_lines
 
 # wqpsc_header_txt = "TIME	CHC	CHD	CHG	ROC	LOC	LDC	RDC	ROP	LOP	LDP	RDP	PO4	RON	LON	LDN	RDN	NH4	NO3	COD	DO	TAM	FCB	REA	MP1	MP2	TEM	DEP	ELE	DYE	NLC	PLC	PMC	PMD	PMG	BMC	PRC	FNC	FIC	TDC	DBN	DBP	SDI"
 wqpsc_header_txt1 = "TIME	CHC	CHD	CHG	ROC	LOC	LDC	RDC	ROP	LOP	LDP	RDP	PO4	RON	LON	LDN	RDN	NH4	NO3"
-wqpsc_header_txt2 = "usable_si unusable_si chemistry_demand_oxygen dissolved_oxygen active_metal EPEC dissolved_se grain_se"
+wqpsc_header_txt2 = "SU      SA    COD     DO    TAM    FCB   DSE   PSE"
+# wqpsc_header_txt2 = "usable_si unusable_si chemistry_demand_oxygen dissolved_oxygen active_metal EPEC dissolved_se grain_se"
 wqpsc_header_txt = wqpsc_header_txt1 + " " + wqpsc_header_txt2
 wqpsc_header = wqpsc_header_txt.split()
 

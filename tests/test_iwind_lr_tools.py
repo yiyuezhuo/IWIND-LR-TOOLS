@@ -45,6 +45,17 @@ def create_environment(ori_root, verbose=True):
             print(f"Copy {ori_root} to {root}")
         yield root, target_root
 
+@contextlib.contextmanager
+def create_environment_fast_only(ori_root, verbose=True):
+    with tempfile.TemporaryDirectory() as temp_path:
+        root = Path(temp_path) / "root"
+        shutil.copytree(ori_root, root)
+        if not non_fast_mode:
+            shutil.copy(efdc_fast, root / "efdc.inp")
+            if verbose:
+                print(f"Override {efdc_fast} -> {root / 'efdc.inp'}")
+        yield root
+
 
 class TestProjection(unittest.TestCase):
 
@@ -69,9 +80,9 @@ class TestProjection(unittest.TestCase):
         actioner = Actioner(*get_all(root))
         actioner.set_simulation_length(MIN_SIMULATION_TIME)
         runner = Runner(root)
-        out = runner.run(efdc_node_list=actioner.data_map["efdc.inp"], qser_node_list=None, wqpsc_node_list=None)
+        out = runner.run(efdc=actioner.data_map["efdc.inp"], qser=None, wqpsc=None)
         
-        self.assertGreater(out["qbal.out"].shape[0], 0)
+        self.assertGreater(out["qbal.out"].shape[0], 1)
 
         if not non_fast_mode:
             fast_length = DataFrameNode.get_df_map(efdc_inp.parse(efdc_fast))["C03"]["NTC"].iloc[0]
@@ -94,10 +105,41 @@ class TestProjection(unittest.TestCase):
             self.file_eq(root / "WQWCTS.out", target_root / "WQWCTS.out")
 
 
-    def test_projection(self):
+    def test_projection_direct(self):
         check_list = ["efdc.inp", "qser.inp", "wqpsc.inp"]
         for name in check_list:
             self._test_projection(name)
+
+    def test_projection_dep(self):
+        with create_environment_fast_only(Path(ori_root)) as root:
+            data = get_all(root)
+            # actioner = Actioner(*data)
+            # actioner.set_simulation_length(MIN_SIMULATION_TIME)
+            data_map = data[0]
+            
+
+            check_list = {
+                "efdc.inp": "efdc", 
+                "qser.inp": "qser", 
+                "wqpsc.inp": "wqpsc", 
+                "wq3dwc.inp": "wq3dwc", 
+                "conc_adjust.inp": "conc_adjust"
+            }
+            run_kwargs_list = [{}]
+            for key, arg_key in check_list.items():
+                run_kwargs_list.append({arg_key: data_map[key]})
+            
+            def work(run_kwargs):
+                runner = Runner(root)
+                return runner.run(**run_kwargs)
+            pool = Pool(6)
+            out_list = pool.map(work, run_kwargs_list)
+
+            for key in out_list[0].keys():
+                self.assertGreater(out_list[0][key].shape[0], 1)
+                for i in range(1, len(check_list)):
+                    self.assertTrue(out_list[0][key].equals(out_list[i][key]))
+
 
     def test_more_time_sanity_check(self):
         # test if test can catch difference if target simulation runs for 1 day more.
@@ -121,8 +163,8 @@ class TestProjection(unittest.TestCase):
         actioner = Actioner(*get_all(root))
         actioner.set_simulation_length(MIN_SIMULATION_TIME)
         run_kwargs_list = [
-            dict(efdc_node_list=actioner.data_map["efdc.inp"], qser_node_list=None, wqpsc_node_list=None),
-            dict(efdc_node_list=actioner.data_map["efdc.inp"], qser_node_list=None, wqpsc_node_list=actioner.data_map["wqpsc.inp"])
+            dict(efdc=actioner.data_map["efdc.inp"], qser=None, wqpsc=None),
+            dict(efdc=actioner.data_map["efdc.inp"], qser=None, wqpsc=actioner.data_map["wqpsc.inp"])
         ]
         pool = Pool(2)
         def work(run_kwargs):
@@ -149,7 +191,7 @@ class TestEnvrionmentIsolation(unittest.TestCase):
 
         date_map = {p: p.stat().st_mtime for p in root.iterdir()}
         runner = Runner(root) # a temp path will be created
-        runner.run(efdc_node_list=data_map["efdc.inp"], qser_node_list=None, wqpsc_node_list=None)
+        runner.run(efdc=data_map["efdc.inp"], qser=None, wqpsc=None)
         for p in root.iterdir():
             self.assertEqual(p.stat().st_mtime, date_map[p])
         
@@ -162,8 +204,8 @@ class TestEnvrionmentIsolation(unittest.TestCase):
         self.assertGreater(efdc_new_time, efdc_old_time)
         self.assertEqual(qser_new_time, qser_old_time)
 
-        runner.write(efdc_node_list=data_map["efdc.inp"], qser_node_list=data_map["qser.inp"],
-                     wqpsc_node_list=None)
+        runner.write(efdc=data_map["efdc.inp"], qser=data_map["qser.inp"],
+                     wqpsc=None)
 
         qser_new_time = (runner.dst_root / "qser.inp").stat().st_mtime
 
@@ -208,8 +250,8 @@ class TestDropEquivalence(unittest.TestCase):
             runner = Runner(root)#, test_root_root / label)
             actioner = label2actioner[label]
             data_map = actioner.data_map
-            dst_out_map = runner.run(efdc_node_list=data_map["efdc.inp"], qser_node_list=data_map["qser.inp"],
-                                    wqpsc_node_list=data_map["wqpsc.inp"])
+            dst_out_map = runner.run(efdc=data_map["efdc.inp"], qser=data_map["qser.inp"],
+                                    wqpsc=data_map["wqpsc.inp"])
                                     # wqpsc_node_list=None)
                                     # wqpsc_node_list=data_map["wqpsc.inp"])
             return dst_out_map

@@ -5,7 +5,7 @@ from typing import List
 
 from .utils import path_to_lines
 from .common import Node, DataFrameNode, CommentNode
-
+from .master_input import generate_parse
 
 card_info_dsl = """
 C02  ISRESTI   ISDRY  ISIMTMP  ISIMWQ  ISIMDYE  TEMO  RKDYE  IASWRAD  SWRATNF   REVCHC  DABEDT  TBEDIT HTBED1 HTBED2    KBHM
@@ -26,12 +26,15 @@ C16 ILTS JLTS  MTSP MTSC MTSA MTSUE MTSUT MTSU MTSQE MTSQ  CLTS
 C17   WID IRELH   RAINCVT   EVAPCVT  SOLRCVT  CLDCVT   TASER   TWSER    WSADJ    WNDD    STANAME
 """
 
+
+"""
 headers_map = OrderedDict()
 for row in card_info_dsl.split("\n"):
     if len(row) == 0:
         continue
     rl = row.split()
     headers_map[rl[0]] = rl[1:]
+"""
 
 forward_lookup_map = {
     "C07": {
@@ -47,7 +50,25 @@ forward_lookup_map = {
     }
 }
 
+length_map_init = {
+    "C02": 1,
+    "C03": 1,
+    "C04": 1,
+    "C05": 1,
+    "C06": 1,
+    "C07": 1,
+    
+    "C13": 1,
+    
+    "C15": 1,
+    
+    "C17": 1
+}
 
+parse = generate_parse(card_info_dsl, forward_lookup_map, length_map_init)
+
+
+"""
 @path_to_lines
 def parse(lines):
     it_lines = (line.strip() for line in lines)
@@ -112,7 +133,7 @@ def parse(lines):
         node_list.append(commend_node)
 
     return node_list
-
+"""
 # get_df_node_list, get_df_node_map, get_df_map = DataFrameNode.get_helpers()
 
 

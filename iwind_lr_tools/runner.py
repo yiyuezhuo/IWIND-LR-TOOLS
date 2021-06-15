@@ -27,8 +27,20 @@ class Runner:
         self.dst_root = Path(dst_root)
         create_simulation(src_root, dst_root)
 
-    def write(self, *, efdc_node_list: List[Node], qser_node_list: List[Node],
-              wqpsc_node_list: List[Node]):
+    def write(self, *, efdc: List[Node]=None, qser: List[Node]=None,
+              wqpsc: List[Node]=None, wq3dwc: List[Node]=None, conc_adjust: List[Node]=None):
+        write_map = {
+            "efdc.inp": efdc,
+            "qser.inp": qser,
+            "wqpsc.inp": wqpsc,
+            "wq3dwc.inp": wq3dwc,
+            "conc_adjust.inp": conc_adjust
+        }
+        for name, node_list in write_map.items():
+            if node_list is not None:
+                with open_safe(self.dst_root / name, "w", encoding="utf8") as f:
+                    f.write(dumps(node_list))
+        """
         if efdc_node_list is not None:
             with open_safe(self.dst_root / "efdc.inp", "w", encoding='utf8') as f:
                 f.write(dumps(efdc_node_list))
@@ -38,6 +50,7 @@ class Runner:
         if wqpsc_node_list is not None:
             with open_safe(self.dst_root / "wqpsc.inp", "w", encoding='utf8') as f:
                 f.write(dumps(wqpsc_node_list))
+        """
     
     def run_simulation(self):
         run_simulation(self.dst_root, popen=False)
@@ -45,13 +58,16 @@ class Runner:
     def parse_out(self):
         return parse_out(self.dst_root)
 
-    def run(self, *, efdc_node_list: List[Node], qser_node_list: List[Node], 
-            wqpsc_node_list: List[Node]):
+    def run_strict(self, *, efdc: List[Node], qser: List[Node],
+              wqpsc: List[Node], wq3dwc: List[Node], conc_adjust: List[Node]):
         # If efdc_node_list or qser_node_list takes None, the value will not be changed.
-        self.write(efdc_node_list=efdc_node_list, qser_node_list=qser_node_list, 
-                    wqpsc_node_list=wqpsc_node_list)
+        self.write(efdc=efdc, qser=qser, wqpsc=wqpsc, wq3dwc=wq3dwc, conc_adjust=conc_adjust)
         self.run_simulation()
         return self.parse_out()
+    
+    def run(self, *, efdc: List[Node]=None, qser: List[Node]=None,
+              wqpsc: List[Node]=None, wq3dwc: List[Node]=None, conc_adjust: List[Node]=None):
+        return self.run_strict(efdc=efdc, qser=qser, wqpsc=wqpsc, wq3dwc=wq3dwc, conc_adjust=conc_adjust)
 
     def cleanup(self):
         # user may want to keep those files

@@ -35,3 +35,6 @@ class Period:
 def zscore(x):
     return (x - x.mean()) / x.std()
 
+plt.rcParams["figure.figsize"] = [8, 6]
+# plt.rcParams['figure.facecolor'] = 'white'
+
