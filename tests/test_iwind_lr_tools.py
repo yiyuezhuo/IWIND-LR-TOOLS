@@ -116,7 +116,6 @@ class TestProjection(unittest.TestCase):
             # actioner = Actioner(*data)
             # actioner.set_simulation_length(MIN_SIMULATION_TIME)
             data_map = data[0]
-            
 
             check_list = {
                 "efdc.inp": "efdc", 
@@ -131,6 +130,7 @@ class TestProjection(unittest.TestCase):
             
             def work(run_kwargs):
                 runner = Runner(root)
+                print(f"{run_kwargs} -> {runner.dst_root}")
                 return runner.run(**run_kwargs)
             pool = Pool(6)
             out_list = pool.map(work, run_kwargs_list)
@@ -214,8 +214,9 @@ class TestEnvrionmentIsolation(unittest.TestCase):
 
 class TestDropEquivalence(unittest.TestCase):
     def test_drop_equivalence(self):
-        return # soft/hard drop doesn't work correctly at this time.
+        # return # soft/hard drop doesn't work correctly at this time.
         root = Path(ori_root)
+        drop_idx = 0
 
         data_ori = data_map_ori, df_node_map_map_ori, df_map_map_ori = get_all(root)
         actioner_ori = Actioner(*data_ori)
@@ -224,44 +225,44 @@ class TestDropEquivalence(unittest.TestCase):
         actioner_iden = deepcopy(actioner_ori)
 
         actioner_drop_hard = deepcopy(actioner_ori)
-        actioner_drop_hard.drop_flow_hard([4])
-        actioner_drop_hard.list_flow_name()
+        actioner_drop_hard.drop_flow_hard([drop_idx])
 
+        """
         actioner_drop_soft = deepcopy(actioner_ori)
         actioner_drop_soft.drop_flow_soft([4])
         actioner_drop_soft.list_flow_name()
+        """
 
         actioner_q0 = deepcopy(actioner_ori)
-        actioner_q0.df_map_map["efdc.inp"]["C08"].loc[actioner_q0.df_map_map["efdc.inp"]["C08"].index[4], "Qfactor"] = 0
-        actioner_q0.df_map_map["efdc.inp"]["C08"]
+        actioner_q0.df_map_map["efdc.inp"]["C08"].loc[actioner_q0.df_map_map["efdc.inp"]["C08"].index[drop_idx], "Qfactor"] = 0
 
         actioner_v0 = deepcopy(actioner_ori)
         actioner_v0.df_map_map["qser.inp"]
-        df = actioner_v0.get_flow_node_list()[4].get_df()
+        df = actioner_v0.get_flow_node_list()[drop_idx].get_df()
         df["flow"] = 0
-        actioner_v0.df_map_map["qser.inp"][actioner_v0.get_flow_node_list()[-1].get_name()]
 
-        actioner_list = [actioner_iden, actioner_drop_hard, actioner_drop_soft, actioner_q0, actioner_v0]
-        label_list = ["iden", "drop_hard", "drop_soft", "q0", "v0"]
-        label2idx = {label:idx for idx, label in enumerate(label_list)}
+        # actioner_list = [actioner_iden, actioner_drop_hard, actioner_drop_soft, actioner_q0, actioner_v0]
+        actioner_list = [actioner_iden, actioner_drop_hard, actioner_q0, actioner_v0]
+        # label_list = ["iden", "drop_hard", "drop_soft", "q0", "v0"]
+        label_list = ["iden", "drop_hard", "q0", "v0"]
         label2actioner = {label:actioner for label, actioner in zip(label_list, actioner_list)}
 
         def work(label):
             runner = Runner(root)#, test_root_root / label)
             actioner = label2actioner[label]
             data_map = actioner.data_map
-            dst_out_map = runner.run(efdc=data_map["efdc.inp"], qser=data_map["qser.inp"],
-                                    wqpsc=data_map["wqpsc.inp"])
-                                    # wqpsc_node_list=None)
-                                    # wqpsc_node_list=data_map["wqpsc.inp"])
+            dst_out_map = runner.run_strict(
+                efdc=data_map["efdc.inp"], qser=data_map["qser.inp"],
+                wqpsc=data_map["wqpsc.inp"], wq3dwc=data_map["wq3dwc.inp"],
+                conc_adjust=data_map["conc_adjust.inp"])
             return dst_out_map
 
-        pool = Pool(5)
+        pool = Pool(len(label_list))
 
         dst_out_map_list = pool.map(work, label_list)
 
         w_list = [dst_out_map["WQWCTS.out"] for dst_out_map in dst_out_map_list]
 
         self.assertTrue(not w_list[0].equals(w_list[1]))
-        for i in [2,3,4]:
+        for i in range(2, len(label_list)):
             self.assertTrue(w_list[1].equals(w_list[i]))

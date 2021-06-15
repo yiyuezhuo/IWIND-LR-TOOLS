@@ -6,7 +6,7 @@ import pandas as pd
 from .utils import path_to_lines, iter_strip
 from .common import Node, FlowAdjustMatrixNode, DataFrameNode, CommentNode
 
-header_s = "Bc Bd Bg ROC LOC LDOC RDC ROP LOP LDOP RDP PO4t RPON LON LDON RDN NH4 NO3 SU SA COD DO TAM FCB DSE PSE"
+header_s = "id Bc Bd Bg ROC LOC LDOC RDC ROP LOP LDOP RDP PO4t RPON LON LDON RDN NH4 NO3 SU SA COD DO TAM FCB DSE PSE"
 header = header_s.split()
 
 def fetch_non_comment_line(lines, node_list):

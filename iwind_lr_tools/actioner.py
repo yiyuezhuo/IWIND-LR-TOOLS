@@ -1,10 +1,11 @@
 
 import pandas as pd
 from typing import List
+from warnings import warn
 
 from .collector import inp_out_map, get_df_node_map_map_and_df_map_map
 from .io import qser_inp
-from .io.common import ConcentrationNode, Node, FlowNode, CommentNode
+from .io.common import ConcentrationNode, Node, FlowNode, CommentNode, FlowAdjustMatrixNode
 
 class Actioner:
     def __init__(self, data_map:dict, df_node_map_map:dict, df_map_map:dict):
@@ -66,25 +67,25 @@ class Actioner:
     """
 
     def select_flow_hard(self, idx_list: List[int]):
-        """
-        Keep some flow and drop otherthing. Ex:
-        Before: [f0, f1, f2, f3, f4, f5]
-        flow_map([3,4,5])
-        After: [f3, f4, f5]
-        """
         old2new = {old_idx: new_idx for new_idx, old_idx in enumerate(idx_list)}
-        # new2old is expressd by idx_list itself
 
+        # Modify efdc.inp
         C07 = self.df_map_map["efdc.inp"]["C07"]
-        C08 = self.df_map_map["efdc.inp"]["C08"].iloc[idx_list].copy()
-        C09 = self.df_map_map["efdc.inp"]["C09"].iloc[idx_list].copy()
+        C08 = self.df_map_map["efdc.inp"]["C08"]
+        C09 = self.df_map_map["efdc.inp"]["C09"]
 
+        assert C07["NQSIJ"].iloc[0] == C07["NQSER"].iloc[0]
         C07["NQSIJ"].iloc[0] = C07["NQSER"].iloc[0] = len(idx_list)
 
-        C08["NQSERQ"] = C08["NQSERQ"].map(lambda x:old2new[x - 1] + 1)
+        C08_selected = C08.iloc[idx_list].copy()
+        C09_selected = C09.iloc[idx_list].copy()
 
-        self.df_node_map_map["efdc.inp"]["C08"].set_df(C08)
-        self.df_node_map_map["efdc.inp"]["C09"].set_df(C09)
+        C08_selected["NQSERQ"] = C08_selected["NQSERQ"].map(lambda x:old2new[x - 1] + 1)
+
+        self.df_node_map_map["efdc.inp"]["C08"].set_df(C08_selected)
+        self.df_node_map_map["efdc.inp"]["C09"].set_df(C09_selected)
+
+        # Modify qser.inp
 
         old_node_list = self.data_map["qser.inp"]
         old_df_node_list = FlowNode.get_df_node_list(old_node_list)
@@ -98,6 +99,8 @@ class Actioner:
         self.data_map["qser.inp"].clear()
         self.data_map["qser.inp"].extend(node_list)
 
+        # Modify wqpsc.inp
+
         old_node_list = self.data_map["wqpsc.inp"]
         old_df_node_list = ConcentrationNode.get_df_node_list(old_node_list)
         df_node_list = [old_df_node_list[idx] for idx in idx_list if idx < len(old_df_node_list)]
@@ -110,22 +113,68 @@ class Actioner:
         self.data_map["wqpsc.inp"].clear()
         self.data_map["wqpsc.inp"].extend(node_list)
 
+        # Modify wq3dwc.inp
+
+        C34_1 = self.df_map_map["wq3dwc.inp"]["C34_1"]
+        C34_2 = self.df_map_map["wq3dwc.inp"]["C34_2"]
+
+        unmapped_idx_set = set(range(C08.shape[0])) - set(range(C34_2.shape[0]))
+        idx_list_wq = [idx for idx in idx_list if idx not in unmapped_idx_set]
+        old2new_wq = {old_idx: new_idx for new_idx, old_idx in enumerate(idx_list_wq)}
+
+        assert C34_1["IWQPS"].iloc[0] == C34_1["NPSTMSR"].iloc[0]
+        C34_1["IWQPS"].iloc[0] = C34_1["NPSTMSR"].iloc[0] = len(idx_list_wq)
+
+        C34_2_selected = C34_2.iloc[idx_list_wq].copy()
+        C34_2_selected["N"] = C34_2_selected["N"].map(lambda x:old2new_wq[x - 1] + 1)
+        
+        self.df_node_map_map["wq3dwc.inp"]["C34_2"].set_df(C34_2_selected)
+
+        # Modify conc_adjust_inp
+
+        for node in self.data_map["conc_adjust.inp"]:
+            if isinstance(node, FlowAdjustMatrixNode):
+                df = node.get_df()
+                df = df.iloc[idx_list_wq]
+                node.set_df(df)
+
         self.sync_from_data_map()
 
     def select_flow_soft(self, idx_list: List[int]):
         """
         Adjust efdc.inp only, leave useless data in qser.inp and wqpsc.inp alone.
         """
-        C07 = self.df_map_map["efdc.inp"]["C07"]
-        C08 = self.df_map_map["efdc.inp"]["C08"].iloc[idx_list].copy()
-        C09 = self.df_map_map["efdc.inp"]["C09"].iloc[idx_list].copy()
 
+        warn("soft selecting is correct implemented at this time.")
+
+        # Modify efdc.inp
+        C07 = self.df_map_map["efdc.inp"]["C07"]
+        C08 = self.df_map_map["efdc.inp"]["C08"]
+        C09 = self.df_map_map["efdc.inp"]["C09"]
+
+        assert C07["NQSIJ"].iloc[0] == C07["NQSER"].iloc[0]
         C07["NQSIJ"].iloc[0] = C07["NQSER"].iloc[0] = len(idx_list)
 
-        # C08["NQSERQ"] = C08["NQSERQ"].map(lambda x:old2new[x - 1] + 1)
+        C08_selected = C08.iloc[idx_list].copy()
+        C09_selected = C09.iloc[idx_list].copy()
 
-        self.df_node_map_map["efdc.inp"]["C08"].set_df(C08)
-        self.df_node_map_map["efdc.inp"]["C09"].set_df(C09)
+        self.df_node_map_map["efdc.inp"]["C08"].set_df(C08_selected)
+        self.df_node_map_map["efdc.inp"]["C09"].set_df(C09_selected)
+
+        # Modify wq3dwc.inp
+
+        C34_1 = self.df_map_map["wq3dwc.inp"]["C34_1"]
+        C34_2 = self.df_map_map["wq3dwc.inp"]["C34_2"]
+
+        unmapped_idx_set = set(range(C08.shape[0])) - set(range(C34_2.shape[0]))
+        idx_list_wq = [idx for idx in idx_list if idx not in unmapped_idx_set]
+
+        assert C34_1["IWQPS"].iloc[0] == C34_1["NPSTMSR"].iloc[0]
+        C34_1["IWQPS"].iloc[0] = C34_1["NPSTMSR"].iloc[0] = len(idx_list_wq)
+
+        C34_2_selected = C34_2.iloc[idx_list_wq].copy()
+        
+        self.df_node_map_map["wq3dwc.inp"]["C34_2"].set_df(C34_2_selected)
 
         self.sync_from_data_map()
 

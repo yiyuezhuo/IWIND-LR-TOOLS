@@ -217,6 +217,9 @@ class FlowAdjustMatrixNode(Node):
         s = df_to_str(df, sep="\t")
         return "\n".join([f"{self.time}", s])
 
+    def set_df(self, df):
+        self.df = df
+
 
 def dumps(node_list: List[Node]):
     """
