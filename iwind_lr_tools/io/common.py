@@ -198,7 +198,8 @@ class FlowAdjustMatrixNode(Node):
     def __init__(self, lines, *, names):
         time_line = lines[0].strip().split()
         assert len(time_line) == 1
-        self.time = float(time_line[0])
+        assert time_line[0].isdigit()
+        self.time = time_line[0] # float(time_line[0])
         
         self.table_data = lines[1:]
         buf = StringIO('\n'.join(self.table_data))

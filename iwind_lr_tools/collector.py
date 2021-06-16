@@ -5,7 +5,7 @@ Collect interested files
 from iwind_lr_tools.io.common import DataFrameNode, FlowNode, ConcentrationNode
 from pathlib import Path
 import pandas as pd
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from .io import aser_inp, efdc_inp, qbal_out, qser_inp, wqpsc_inp, WQWCTS_out, wq3dwc_inp, conc_adjust_inp
 
@@ -20,8 +20,18 @@ class ModelXML:
         tag = self.tree.find("ReferenceTime")
         self.ref_date = parse(tag.text)
 
+    def to_date(self, arr):
+        return [self.ref_date + timedelta(x) for x in arr]
+
+    def get_date(self, df: pd.DataFrame, key:str):
+        return df[key].map(lambda x: self.ref_date + timedelta(days=x))
+
     def enhance_date(self, df: pd.DataFrame, key:str, date_key="date"):
-        df[date_key] = df[key].map(lambda x: self.ref_date + timedelta(days=x))
+        df[date_key] = self.get_date(df, key)
+
+    def to_time(self, date: datetime):
+        delta  = date - self.ref_date
+        return delta.total_seconds() / (60*60*24)
 
 def get_model(root):
     root_parent = Path(root) / ".."
@@ -31,17 +41,17 @@ def get_model(root):
     return ModelXML(model_p)
 
 inp_map = {
-    "aser.inp": aser_inp,
-    "efdc.inp": efdc_inp,
-    "qser.inp": qser_inp,
-    "wqpsc.inp": wqpsc_inp,
-    "wq3dwc.inp": wq3dwc_inp,
-    "conc_adjust.inp": conc_adjust_inp
+    "aser.inp": aser_inp, # weather time series
+    "efdc.inp": efdc_inp, # general master input
+    "qser.inp": qser_inp, # flow time series
+    "wqpsc.inp": wqpsc_inp, # concentration of inflow time series
+    "wq3dwc.inp": wq3dwc_inp, # concentration of pollutant master input
+    "conc_adjust.inp": conc_adjust_inp # concentration adjust matrix
 }
 
 out_map = {
-    "qbal.out": qbal_out,
-    "WQWCTS.out": WQWCTS_out
+    "qbal.out": qbal_out, # general stats
+    "WQWCTS.out": WQWCTS_out # concenteration of outflow time series
 }
 
 has_df_map_list = ["efdc.inp", "qser.inp", "wqpsc.inp", "wq3dwc.inp"]

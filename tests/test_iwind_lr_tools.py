@@ -213,33 +213,29 @@ class TestEnvrionmentIsolation(unittest.TestCase):
 
 
 class TestDropEquivalence(unittest.TestCase):
-    def test_drop_equivalence(self):
+
+    def _test_drop_equivalence_mult(self, drop_idx_list):
         # return # soft/hard drop doesn't work correctly at this time.
         root = Path(ori_root)
-        drop_idx = 0
 
         data_ori = data_map_ori, df_node_map_map_ori, df_map_map_ori = get_all(root)
         actioner_ori = Actioner(*data_ori)
         actioner_ori.set_simulation_length(MIN_SIMULATION_TIME)
 
         actioner_iden = deepcopy(actioner_ori)
-
         actioner_drop_hard = deepcopy(actioner_ori)
-        actioner_drop_hard.drop_flow_hard([drop_idx])
-
-        """
-        actioner_drop_soft = deepcopy(actioner_ori)
-        actioner_drop_soft.drop_flow_soft([4])
-        actioner_drop_soft.list_flow_name()
-        """
-
         actioner_q0 = deepcopy(actioner_ori)
-        actioner_q0.df_map_map["efdc.inp"]["C08"].loc[actioner_q0.df_map_map["efdc.inp"]["C08"].index[drop_idx], "Qfactor"] = 0
-
         actioner_v0 = deepcopy(actioner_ori)
-        actioner_v0.df_map_map["qser.inp"]
-        df = actioner_v0.get_flow_node_list()[drop_idx].get_df()
-        df["flow"] = 0
+
+        actioner_drop_hard.drop_flow_hard(drop_idx_list)
+
+        C08 = actioner_q0.df_map_map["efdc.inp"]["C08"]
+        for drop_idx in drop_idx_list:
+            C08.loc[C08.index[drop_idx], "Qfactor"] = 0
+
+            actioner_v0.df_map_map["qser.inp"]
+            df = actioner_v0.get_flow_node_list()[drop_idx].get_df()
+            df["flow"] = 0
 
         # actioner_list = [actioner_iden, actioner_drop_hard, actioner_drop_soft, actioner_q0, actioner_v0]
         actioner_list = [actioner_iden, actioner_drop_hard, actioner_q0, actioner_v0]
@@ -266,3 +262,47 @@ class TestDropEquivalence(unittest.TestCase):
         self.assertTrue(not w_list[0].equals(w_list[1]))
         for i in range(2, len(label_list)):
             self.assertTrue(w_list[1].equals(w_list[i]))
+
+    def test_drop_equivalence_single(self):
+        # Strangely, some implements seems correct for only one selecting value
+        return self._test_drop_equivalence_mult([0])
+
+    def test_drop_equivalence_mult(self):
+        return self._test_drop_equivalence_mult([0, 2])
+
+    def test_select_flow(self):
+        root = Path(ori_root)
+        mode_list = ["iden", "hard", "flow", "qfactor"]
+        idx_list = [0, 2]
+        
+        actioner_ori = Actioner(*get_all(root))
+        actioner_ori.set_simulation_length(MIN_SIMULATION_TIME)
+
+        actioner_list = [deepcopy(actioner_ori) for mode in mode_list]
+        mode2actioner = {mode:actioner for mode, actioner in zip(mode_list, actioner_list)}
+
+        for mode, actioner in zip(mode_list, actioner_list):
+            if mode == "iden":
+                continue
+            actioner.select_flow(idx_list, mode=mode)
+                    
+        def work(label):
+            runner = Runner(root)#, test_root_root / label)
+            actioner = mode2actioner[label]
+            data_map = actioner.data_map
+            dst_out_map = runner.run_strict(
+                efdc=data_map["efdc.inp"], qser=data_map["qser.inp"],
+                wqpsc=data_map["wqpsc.inp"], wq3dwc=data_map["wq3dwc.inp"],
+                conc_adjust=data_map["conc_adjust.inp"])
+            return dst_out_map
+
+        pool = Pool(len(mode_list))
+        dst_out_map_list = pool.map(work, mode_list)
+        w_list = [dst_out_map["WQWCTS.out"] for dst_out_map in dst_out_map_list]
+
+        self.assertTrue(not w_list[0].equals(w_list[1]))
+        self.assertGreater(w_list[1].shape[0], 1)
+        for i in range(2, len(mode_list)):
+            self.assertTrue(w_list[1].equals(w_list[i]))
+        
+

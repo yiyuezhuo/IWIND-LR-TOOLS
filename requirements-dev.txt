@@ -2,3 +2,5 @@ ipykernel
 matplotlib
 pytest
 coverage
+sklearn
+scipy

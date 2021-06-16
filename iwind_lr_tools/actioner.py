@@ -1,4 +1,5 @@
 
+from multiprocessing.dummy import Value
 import pandas as pd
 from typing import List
 from warnings import warn
@@ -35,36 +36,6 @@ class Actioner:
         self.df_map_map.clear()
         self.df_map_map.update(_df_map_map)
 
-    """
-    def _set_flow(self, C08: pd.DataFrame, C09: pd.DataFrame, qser_node_list: List[Node]):
-        C08_ref = self.df_map_map["efdc.inp"]["C08"]
-        C09_ref = self.df_map_map["efdc.inp"]["C09"]
-        qser_node_list_ref = self.data_map["qser.inp"]
-
-        assert C08 is not C08_ref
-        assert C09 is not C09_ref
-        assert qser_node_list is not qser_node_list_ref
-
-        # self.df_map_map["efdc.inp"]["C08"] = C08
-        # self.df_map_map["efdc.inp"]["C09"] = C09
-        self.df_node_map_map["efdc.inp"]["C08"].set_df(C08)
-        self.df_node_map_map["efdc.inp"]["C09"].set_df(C09)
-
-        qser_node_list_ref.clear()
-        qser_node_list_ref.extend(qser_node_list)
-
-        # self.sync_df_map_map(["qser.inp"])
-        self.sync_from_data_map()
-        
-        n = C08.shape[0]
-        C07 = self.df_map_map["efdc.inp"]["C07"]
-        C07["NQSIJ"].iloc[0] = n
-        C07["NQSER"].iloc[0] = n
-
-    def set_flow(self, C08:pd.DataFrame, C09:pd.DataFrame, flow_node_list: List[FlowNode]):
-        node_list = self.data_map["qser.inp"][:1] + flow_node_list
-        return self._set_flow(C08, C09, node_list)
-    """
 
     def select_flow_hard(self, idx_list: List[int]):
         old2new = {old_idx: new_idx for new_idx, old_idx in enumerate(idx_list)}
@@ -178,24 +149,57 @@ class Actioner:
 
         self.sync_from_data_map()
 
+    """
+    def idx_list_to_drop_list(self, idx_list: List[int]):
+        idx_set = set(range(self.count_flow()))
+        drop_idx_list = [idx for idx in idx_list if idx not in idx_set]
+        return drop_idx_list
+    """
 
-    def select_flow(self, idx_list: List[int]):
+    def select_flow_flow0(self, idx_list: List[int]):
+        drop_idx_list = self.get_flow_comp(idx_list)
+
+        for drop_idx in drop_idx_list:
+            self.df_map_map["qser.inp"]
+            df = self.get_flow_node_list()[drop_idx].get_df()
+            df["flow"] = 0
+
+    def select_flow_qfactor0(self, idx_list: List[int]):
+        drop_idx_list = self.get_flow_comp(idx_list)
+
+        C08 = self.df_map_map["efdc.inp"]["C08"]
+        for drop_idx in drop_idx_list:
+            C08.loc[C08.index[drop_idx], "Qfactor"] = 0
+
+    def select_flow(self, idx_list: List[int], mode="hard"):
         # return self.select_flow_soft()
-        return self.select_flow_hard()
+        if mode == "hard":
+            return self.select_flow_hard(idx_list)
+        elif mode == "soft":
+            raise ValueError("Soft selecting is not correctly implemented at this time")
+        elif mode == "flow":
+            return self.select_flow_flow0(idx_list)
+        elif mode == "qfactor":
+            return self.select_flow_qfactor0(idx_list)
+        else:
+            raise ValueError(f"Unknown mode: {mode}, valid mode is hard, flow and qfactor")
 
     def get_flow_comp(self, selected_idx):
         selected_idx_set = set(selected_idx)
         remain_idx_list = [idx for idx in range(self.count_flow()) if idx not in selected_idx_set]
         return remain_idx_list
 
+    """
     def drop_flow_soft(self, selected_idx):
         return self.select_flow_soft(self.get_flow_comp(selected_idx))
 
     def drop_flow_hard(self, selected_idx):
         return self.select_flow_hard(self.get_flow_comp(selected_idx))
+    """
 
-    def drop_flow(self, selected_idx):
-        return self.drop_flow_hard(selected_idx)
+    def drop_flow(self, drop_idx_list: List[int], mode="hard"):
+        selected_idx = self.get_flow_comp(drop_idx_list)
+        return self.select_flow(selected_idx, mode=mode)
 
     def count_flow(self):
         # return len(self.df_map_map["qser.inp"]) # soft drop will not work correctly
@@ -216,6 +220,15 @@ class Actioner:
 
     def get_concenteration_node_list(self):
         return ConcentrationNode.get_df_node_list(self.data_map["wqpsc.inp"])
+
+    def to_run_strict_kwargs(self):
+        # reference
+        data_map = self.data_map
+        return dict(
+            efdc=data_map["efdc.inp"], qser=data_map["qser.inp"],
+            wqpsc=data_map["wqpsc.inp"], wq3dwc=data_map["wq3dwc.inp"],
+            conc_adjust=data_map["conc_adjust.inp"]
+        )
 
 
 
