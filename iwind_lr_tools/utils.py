@@ -1,7 +1,9 @@
 
 from pathlib import Path
 import subprocess
-
+from threading import Lock
+from tempfile import mkdtemp
+ 
 def path_to_lines(func):
     def _func(p):
         with open(p, encoding="utf8") as f:
@@ -39,3 +41,8 @@ def open_safe(path, mode, **kwargs):
         p.unlink()
     return open(p, mode, **kwargs)
 
+lock = Lock()
+
+def mkdtemp_locked():
+    with lock:
+        return mkdtemp()

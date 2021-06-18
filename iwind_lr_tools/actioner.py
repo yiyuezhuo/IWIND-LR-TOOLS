@@ -9,6 +9,7 @@ from .collector import inp_out_map, get_df_node_map_map_and_df_map_map
 from .io import qser_inp
 from .io.common import ConcentrationNode, Node, FlowNode, CommentNode, FlowAdjustMatrixNode
 
+
 class Actioner:
     def __init__(self, data_map:dict, df_node_map_map:dict, df_map_map:dict):
         self.data_map = data_map
@@ -207,15 +208,6 @@ class Actioner:
     def get_concenteration_node_list(self):
         return ConcentrationNode.get_df_node_list(self.data_map["wqpsc.inp"])
 
-    def to_run_strict_kwargs(self):
-        # reference
-        data_map = self.data_map
-        return dict(
-            efdc=data_map["efdc.inp"], qser=data_map["qser.inp"],
-            wqpsc=data_map["wqpsc.inp"], wq3dwc=data_map["wq3dwc.inp"],
-            conc_adjust=data_map["conc_adjust.inp"]
-        )
-
     def to_data(self):
         return (self.data_map, self.df_node_map_map, self.df_map_map)
 
@@ -254,6 +246,6 @@ class Actioner:
 
         idx_begin = 2 * time_begin
         idx_end = 2 * time_end
-        
+
         index = df.index[idx_begin: idx_end]
         df.loc[index, "flow"] = df_target.loc[index, "flow"]

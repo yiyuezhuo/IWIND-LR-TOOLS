@@ -13,10 +13,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from copy import deepcopy
-from multiprocessing.dummy import Pool
-from multiprocessing import cpu_count
 
-from iwind_lr_tools import create_simulation, run_simulation, dumps, Actioner, Runner
+from iwind_lr_tools import create_simulation, run_simulation, dumps, Actioner, Runner, run_batch
 from .collector import get_all, get_model
 from .load_stats import get_aligned_dict, get_aligned_df, stats_load
 
@@ -39,18 +37,6 @@ def zscore(x):
 plt.rcParams["figure.figsize"] = [10, 6]
 plt.rcParams['figure.facecolor'] = 'white'
 
-def work(process_args):
-    root = process_args["root"]
-    run_kwargs = process_args["run_kwargs"]
-    runner = Runner(root)
-    return runner.run_strict(**run_kwargs)
-
-def run_batch(root, run_kwargs_list, pool_size=None):
-    if pool_size is None:
-        pool_size = cpu_count() // 2 # assumes x2 hyper-threads
-    pool = Pool(pool_size)
-    process_args_list = [{"root":root, "run_kwargs": run_kwargs} for run_kwargs in run_kwargs_list]
-    return pool.map(work, process_args_list)
 
 def plot_two_y(x, y1, y2, x_label="x", y1_label=None, y2_label=None, alpha=0.9, markersize=6):
     fig, ax1 = plt.subplots()

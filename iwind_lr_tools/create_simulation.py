@@ -10,7 +10,6 @@ import json
 from typing import List
 from warnings import warn
 
-# from .utils import get_exe_p
 
 selectd_name_list_path_default = Path(__file__).parent / "non_modified_files.json"
 if selectd_name_list_path_default.exists():

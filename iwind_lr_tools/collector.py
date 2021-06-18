@@ -62,6 +62,8 @@ node_cls_map = {
     "wq3dwc.inp": DataFrameNode
 }
 
+dumpable_list = ["efdc.inp", "qser.inp", "wqpsc.inp", "wq3dwc.inp", "conc_adjust.inp"]
+
 # dependences and extra_length_map
 dep_map = {
     "wq3dwc.inp": (["efdc.inp"], wq3dwc_inp.parse_dep),
