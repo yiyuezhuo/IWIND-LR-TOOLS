@@ -1,5 +1,6 @@
 
 import pandas as pd
+import numpy as np
 
 def fetch_time(df, key):
     """
@@ -51,7 +52,35 @@ def fetch_skip(df, key):
     """
     return df[key][::2].to_numpy()
 
-def get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_keys=None, aser_keys=None):
+def fluctuation_smooth(seq: np.ndarray):
+    """
+    The model sometime give [high, 0] sequence due to so called numerical problem when water is too "enough".
+    However, the de-fluctuation "true" value may be interesting for decision alogrithom, 
+    thus this function try to give an approximation by smoothing like: 
+
+    0.2, 0.3, 0.8, 0.0, 1.2, 0.0, ...
+    ->
+    0.2, 0.3, 0.4, 0.5, 0.6, 0.7, ...
+
+    Note: This pattern may fail for right 
+    """
+    idx0 = np.where(seq == 0)[0]
+    if len(idx0) == 0:
+        return
+    
+    if idx0[0] == 0:
+        idx0 = idx0[1:]
+    idxp = idx0 - 1
+
+    smoothed = (seq[idx0] + seq[idxp]) / 2
+
+    seq[idx0] = seq[idxp] = smoothed
+    
+    return seq
+
+
+def get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_keys=None, aser_keys=None,
+                     smooth_wqpsc_inp=True):
     """
     out_map is the output of run and optional.
     """
@@ -80,7 +109,10 @@ def get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_
     for wq_key in wq_keys:
         for flow_key, df in df_map_map["wqpsc.inp"].items():
             key = f"{wq_key}_{flow_key}"
-            aligned_dict[key] = fetch_skip(df, wq_key)
+            seq = fetch_skip(df, wq_key)
+            if smooth_wqpsc_inp:
+                fluctuation_smooth(seq)
+            aligned_dict[key] = seq
 
     for key, df in df_map_map["qser.inp"].items():
         key = f"flow_{key}"
@@ -91,8 +123,11 @@ def get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_
 
     return aligned_dict
 
-def get_aligned_df(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_keys=None, aser_keys=None):
-    aligned_dict = get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map=out_map, wq_keys=wq_keys, aser_keys=aser_keys)
+def get_aligned_df(data_map, df_node_map_map, df_map_map, out_map=None, **kwargs):
+    """
+    This function itself may modify data passed in, so is not a pure "view".
+    """
+    aligned_dict = get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map, **kwargs)
 
     min_length = min([len(arr) for arr in aligned_dict.values()])
     aligned_dict = {key: value[:min_length] for key, value in aligned_dict.items()}
@@ -100,10 +135,19 @@ def get_aligned_df(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_ke
 
     return aligned_df
 
-def get_load(aligned_df, ):
-    pass
+def stats_load(df, df_ori, wq_key, flow_key_list, qctlo_key="qctlo", pump_key="pump_outflow"):
+    """
+    df_ori should has un-modified qser.
+    """
+    
+    dd = {}
+    dd[f"load_{qctlo_key}"] = df[f"{wq_key}_{qctlo_key}"] * df[f"flow_{qctlo_key}"]
+    for flow_key in flow_key_list:
+        diff = df_ori[f"flow_{flow_key}"] - df[f"flow_{flow_key}"]
+        dd[f"load_{flow_key}"] = df[f"{wq_key}_{flow_key}"] * diff
+    dd[f"load_{pump_key}"] = df[f"flow_{pump_key}"] * df[f"{wq_key}_{pump_key}"]
 
-
-class LoadAccountant:
-    def __init__(self):
-        pass
+    rdf = pd.DataFrame(dd)
+    rdf["load_flow"] = rdf[[f"load_{flow_key}" for flow_key in flow_key_list]].sum(axis=1)
+    rdf["load_total"] = rdf[f"load_{qctlo_key}"] + rdf["load_flow"] + rdf[f"load_{pump_key}"]
+    return rdf

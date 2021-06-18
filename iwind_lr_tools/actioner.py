@@ -3,6 +3,7 @@ from multiprocessing.dummy import Value
 import pandas as pd
 from typing import List
 from warnings import warn
+from copy import deepcopy
 
 from .collector import inp_out_map, get_df_node_map_map_and_df_map_map
 from .io import qser_inp
@@ -149,13 +150,6 @@ class Actioner:
 
         self.sync_from_data_map()
 
-    """
-    def idx_list_to_drop_list(self, idx_list: List[int]):
-        idx_set = set(range(self.count_flow()))
-        drop_idx_list = [idx for idx in idx_list if idx not in idx_set]
-        return drop_idx_list
-    """
-
     def select_flow_flow0(self, idx_list: List[int]):
         drop_idx_list = self.get_flow_comp(idx_list)
 
@@ -188,14 +182,6 @@ class Actioner:
         selected_idx_set = set(selected_idx)
         remain_idx_list = [idx for idx in range(self.count_flow()) if idx not in selected_idx_set]
         return remain_idx_list
-
-    """
-    def drop_flow_soft(self, selected_idx):
-        return self.select_flow_soft(self.get_flow_comp(selected_idx))
-
-    def drop_flow_hard(self, selected_idx):
-        return self.select_flow_hard(self.get_flow_comp(selected_idx))
-    """
 
     def drop_flow(self, drop_idx_list: List[int], mode="hard"):
         selected_idx = self.get_flow_comp(drop_idx_list)
@@ -230,5 +216,44 @@ class Actioner:
             conc_adjust=data_map["conc_adjust.inp"]
         )
 
+    def to_data(self):
+        return (self.data_map, self.df_node_map_map, self.df_map_map)
 
+    def copy(self):
+        return deepcopy(self)
 
+    def set_flow_range(self, flow_key, value, time_begin, time_end):
+        df = self.df_map_map["qser.inp"][flow_key]
+
+        if time_begin is None:
+            time_begin = 0
+        if time_end is None:
+            time_end = df.shape[0] // 2
+
+        # TODO: support float set, but that may damage current abstraction
+        assert isinstance(time_begin, int), "set_flow_range support int only now"
+        assert isinstance(time_end, int), "set_flow_range support int only now"
+
+        idx_begin = 2 * time_begin
+        idx_end = 2 * time_end
+        
+        index = df.index[idx_begin: idx_end]
+        df.loc[index, "flow"] = value
+
+    def set_flow_range_to_0(self, flow_key, time_begin, time_end):
+        self.set_flow_range(flow_key, 0, time_begin, time_end)
+
+    def set_flow_range_from_actioner(self, flow_key, actioner, time_begin, time_end):
+        df = self.df_map_map["qser.inp"][flow_key]
+        df_target = actioner.df_map_map["qser.inp"][flow_key]
+
+        if time_begin is None:
+            time_begin = 0
+        if time_end is None:
+            time_end = df.shape[0] // 2
+
+        idx_begin = 2 * time_begin
+        idx_end = 2 * time_end
+        
+        index = df.index[idx_begin: idx_end]
+        df.loc[index, "flow"] = df_target.loc[index, "flow"]

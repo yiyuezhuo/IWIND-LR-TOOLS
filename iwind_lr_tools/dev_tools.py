@@ -18,7 +18,7 @@ from multiprocessing import cpu_count
 
 from iwind_lr_tools import create_simulation, run_simulation, dumps, Actioner, Runner
 from .collector import get_all, get_model
-from .load_stats import get_aligned_dict, get_aligned_df
+from .load_stats import get_aligned_dict, get_aligned_df, stats_load
 
 # from .extract_non_modified_files import extract_non_modified_files
 
@@ -52,12 +52,12 @@ def run_batch(root, run_kwargs_list, pool_size=None):
     process_args_list = [{"root":root, "run_kwargs": run_kwargs} for run_kwargs in run_kwargs_list]
     return pool.map(work, process_args_list)
 
-def plot_two_y(x, y1, y2, x_label="x", y1_label=None, y2_label=None, alpha=0.9):
+def plot_two_y(x, y1, y2, x_label="x", y1_label=None, y2_label=None, alpha=0.9, markersize=6):
     fig, ax1 = plt.subplots()
 
     ax2 = ax1.twinx()
-    ax1.plot(x, y1, 'g-', alpha=alpha)
-    ax2.plot(x, y2, 'b-', alpha=alpha)
+    ax1.plot(x, y1, 'go-', alpha=alpha, markersize=markersize)
+    ax2.plot(x, y2, 'bo-', alpha=alpha, markersize=markersize)
 
     ax1.set_xlabel(x_label)
     ax1.set_ylabel(y1_label, color='green')
@@ -72,7 +72,7 @@ def plot_aligned_df_compare(df, key1, key2, alpha=0.9):
 
     plot_two_y(x, y1, y2, x_label=x_label, y1_label=key1, y2_label=key2, alpha=alpha)
 
-def plot_aligned_df_parallel(df, keys=None, normed=False):
+def plot_aligned_df_parallel(df, keys=None, normed=False, **kwargs):
     x_label = "date" if "date" in df else "time"
 
     if keys is None:
@@ -81,7 +81,11 @@ def plot_aligned_df_parallel(df, keys=None, normed=False):
     x = df[x_label]
     for key in keys:
         y = zscore(df[key]) if normed else df[key]
-        plt.plot(x, y, label=key)
+        plt.plot(x, y, 'o-', label=key, **kwargs)
     
     plt.xlabel(x_label)
     plt.legend()
+
+def show_full_df(df):
+    from IPython.display import display, HTML
+    display(HTML(df.to_html()))

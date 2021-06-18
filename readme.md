@@ -79,7 +79,7 @@ coverage html
 
 Check `htmlcov/index.html`.
 
-## Note
+## Notes
 
 * It's strange that qser's `nlines` can be `0` so I am forced to check number of cell for every line to determine the shape of a dataframe.
 * The test sometimes will randomly fail, though if you run it again it will pass. I have not investigate the cause.
