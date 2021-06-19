@@ -80,7 +80,7 @@ def fluctuation_smooth(seq: np.ndarray):
 
 
 def get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_keys=None, aser_keys=None,
-                     smooth_wqpsc_inp=True, drop_WQWCTS_out_obsession_edge_int=True):
+                     smooth_wqpsc_inp=True, drop_WQWCTS_OUT_obsession_edge_int=True):
     """
     out_map is the output of run and optional.
     """
@@ -99,9 +99,9 @@ def get_aligned_dict(data_map, df_node_map_map, df_map_map, out_map=None, *, wq_
         aligned_dict["flow_qctlo"] = - fetch_diff(out_map["qbal.out"], "qctlo(million-m3)") * 1_000_000 # million-m3 -> m3
         aligned_dict["elev"] = fetch_roll(out_map["qbal.out"], "elev(m)")
 
-        gb = out_map["WQWCTS.out"].groupby(["I", "J", "K"])
+        gb = out_map["WQWCTS.OUT"].groupby(["I", "J", "K"])
         wq_ij_map = dict(tuple(gb))
-        if drop_WQWCTS_out_obsession_edge_int:
+        if drop_WQWCTS_OUT_obsession_edge_int:
             wq_ij_map = {key: drop_obsession_edge_int(value, "TIME") for key, value in wq_ij_map.items()}
         for wq_key in wq_keys:
             for ij_tuple in wq_ij_map:
@@ -186,7 +186,7 @@ def drop_obsession_WQCTS_out(df, **kwargs):
     return df.groupby(["I", "J", "K"]).apply(lambda _df: drop_obsession_edge_int(_df, "TIME", **kwargs)).\
         reset_index(level=[0,1,2], drop=True).sort_index()
 
-def append_WQWCTS_out(df1: pd.DataFrame, df2: pd.DataFrame):
+def append_WQWCTS_OUT(df1: pd.DataFrame, df2: pd.DataFrame):
     df1 = drop_obsession_WQCTS_out(df1, cut_tail=True) 
     # cut_tail=True => ..., 0.99976, 1.00024, ... -> ..., 1.00024, ...
     df2 = drop_obsession_WQCTS_out(df2)
@@ -200,5 +200,5 @@ def append_qbal_out(df1: pd.DataFrame, df2: pd.DataFrame):
 
 def append_out_map(out_map1, out_map2):
     # TODO: since "exact" append_qbal_out is impossible to implement at this time, is it useful to implement a approximated version to help pipeline?
-    append_map = {"qbal.out": append_qbal_out, "WQWCTS.out": append_WQWCTS_out}
+    append_map = {"qbal.out": append_qbal_out, "WQWCTS.OUT": append_WQWCTS_OUT}
     return {key: append(out_map1[key], out_map2[key]) for key, append in append_map.items()}

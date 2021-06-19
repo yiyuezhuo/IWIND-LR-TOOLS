@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from datetime import datetime, timedelta
 
-from .io import aser_inp, efdc_inp, qbal_out, qser_inp, wqpsc_inp, WQWCTS_out, wq3dwc_inp, conc_adjust_inp
+from .io import aser_inp, efdc_inp, qbal_out, qser_inp, wqpsc_inp, WQWCTS_OUT, wq3dwc_inp, conc_adjust_inp
 
 class ModelXML:
     def __init__(self, xml_path: str):
@@ -51,7 +51,7 @@ inp_map = {
 
 out_map = {
     "qbal.out": qbal_out, # general stats
-    "WQWCTS.out": WQWCTS_out # concenteration of outflow time series
+    "WQWCTS.OUT": WQWCTS_OUT # concenteration of outflow time series
 }
 
 has_df_map_list = ["efdc.inp", "qser.inp", "wqpsc.inp", "wq3dwc.inp"]

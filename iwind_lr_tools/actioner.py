@@ -22,13 +22,28 @@ class Actioner:
     def set_simulation_length(self, value):
         self.df_map_map["efdc.inp"]["C03"]["NTC"].iloc[0] = value
 
+    def enable_restart(self):
+        C02 = self.df_map_map["efdc.inp"]["C02"]
+        C02.loc[0, "ISRESTI"] = 1
+
+    def is_restarting(self):
+        C02 = self.df_map_map["efdc.inp"]["C02"]
+        return True if C02.loc[0, "ISRESTI"] == 1 else False
+
+    def set_simulation_begin_time(self, value):
+        C03 = self.df_map_map["efdc.inp"]["C03"]
+        C03.loc[0, "TBEGIN"] = value
+
+    def get_simulation_begin_time(self):
+        C03 = self.df_map_map["efdc.inp"]["C03"]
+        return C03.loc[0, "TBEGIN"]
+
     def sync_from_data_map(self):
         _df_node_map_map, _df_map_map = get_df_node_map_map_and_df_map_map(self.data_map)
         self.df_node_map_map.clear()
         self.df_node_map_map.update(_df_node_map_map)
         self.df_map_map.clear()
         self.df_map_map.update(_df_map_map)
-
 
     def select_flow_hard(self, idx_list: List[int]):
         old2new = {old_idx: new_idx for new_idx, old_idx in enumerate(idx_list)}
