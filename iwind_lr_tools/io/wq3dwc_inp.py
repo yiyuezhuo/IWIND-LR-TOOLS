@@ -105,7 +105,7 @@ length_map_init = {
 }
 
 parse = generate_parse(card_info_dsl, forward_lookup_map, length_map_init)
-# C40 must be passed as extra_length_map
+# C40 must be supplied as extra_length_map
 
 def parse_dep(data_map: List[Node]):
     node_list = data_map["efdc.inp"]

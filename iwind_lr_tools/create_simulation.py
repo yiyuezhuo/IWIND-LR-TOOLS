@@ -2,6 +2,8 @@
 This module provide both function which should be called from REPL and a CLI based on clize
 """
 
+from .utils import symlink_locked
+from os import symlink
 from pathlib import Path
 import shutil
 import datetime
@@ -29,7 +31,8 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None,
     if target_root.exists():
         # target_root.rmdir()
         for f in target_root.iterdir():
-            shutil.rmtree(f)
+            # shutil.rmtree(f)
+            f.unlink()
         if verbose:
             print(f"Deleted existed files in {target_root}")
     else:
@@ -37,11 +40,14 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None,
 
     link_list:List[Path] = list(origin_root.glob("*.exe")) + [origin_root / name for name in selected_name_list]
 
-    for src in link_list:
-        dst = target_root / src.relative_to(origin_root)
+    for dst in link_list:
+        src = target_root / dst.relative_to(origin_root)
         #"""
         # method 0 (x)
-        dst.symlink_to(src)
+        #dst.symlink_to(src)
+        # This race-condition shit waste my a lot of time. 
+        symlink_locked(src, dst)
+        assert src.is_file(), "Created symlink failed?????"
         #"""
         """
         # method 1 (x)
@@ -57,6 +63,7 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None,
 
     if verbose:
         print(f"Done: Symbolinking all files from {target_root} to {origin_root}")
+
 
 """
 def _create_experiment(origin_root:str, target_root:str, verbose=True):

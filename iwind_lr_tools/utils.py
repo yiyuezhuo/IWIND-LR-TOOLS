@@ -3,6 +3,7 @@ from pathlib import Path
 import subprocess
 from threading import Lock
 from tempfile import mkdtemp
+import pandas as pd
  
 def path_to_lines(func):
     def _func(p):
@@ -41,8 +42,15 @@ def open_safe(path, mode, **kwargs):
         p.unlink()
     return open(p, mode, **kwargs)
 
-lock = Lock()
+mkdtemp_lock = Lock()
 
 def mkdtemp_locked():
-    with lock:
+    with mkdtemp_lock:
         return mkdtemp()
+
+symlink_lock = Lock()
+
+def symlink_locked(src:Path, dst:Path):
+    with symlink_lock:
+        src.symlink_to(dst)
+

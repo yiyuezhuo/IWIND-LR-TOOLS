@@ -22,15 +22,6 @@ class Actioner:
     def set_simulation_length(self, value):
         self.df_map_map["efdc.inp"]["C03"]["NTC"].iloc[0] = value
 
-    """
-    def sync_from_data_map(self, keys=None):
-        if keys is None:
-            keys = self.df_map_map.keys()
-        for key in keys:
-            # df_map_map[key] = inp_out_map[key].get_df_map(data_map[key])
-            self.df_map_map[key].clear()
-            self.df_map_map[key].update(inp_out_map[key].get_df_map(self.data_map[key]))
-    """
     def sync_from_data_map(self):
         _df_node_map_map, _df_map_map = get_df_node_map_map_and_df_map_map(self.data_map)
         self.df_node_map_map.clear()
