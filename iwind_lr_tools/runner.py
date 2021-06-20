@@ -169,34 +169,6 @@ def work_restart(process_args: dict):
     TEMPBRST_OUT.rename(TEMPB_RST)
     WQWCRST_OUT.rename(wqini_inp)
 
-    """
-    RESTART_INP = dst_root / "RESTART.INP"
-    if not RESTART_INP.is_symlink():
-        if RESTART_INP.exists(): # prevent occatially copying file from original root.
-            RESTART_INP.unlink()
-        RESTART_OUT = dst_root / "RESTART.OUT"
-        assert RESTART_OUT.exists(), "RESTART.INP or RESTART.OUT must be given"
-        RESTART_INP.symlink_to(RESTART_OUT)
-
-    TEMPB_RST = dst_root / "TEMPB.RST"
-    if not TEMPB_RST.is_symlink():
-        if TEMPB_RST.exists():
-            TEMPB_RST.unlink()
-        TEMPBRST_OUT = dst_root / "TEMPBRST.OUT"
-        assert TEMPBRST_OUT.exists(), "TEMPB.RST or TEMPBRST.OUT must be given"
-        TEMPB_RST.symlink_to(TEMPBRST_OUT)
-
-    wqini_inp = dst_root / "wqini.inp"
-    assert wqini_inp.is_symlink()
-    WQWCRST_OUT = dst_root / "WQWCRST.OUT"
-    assert WQWCRST_OUT.exists(), "To restart, wqini_inp should exsited and be linked"
-    if Path(os.readlink(wqini_inp)) != WQWCRST_OUT:
-        wqini_inp.unlink()
-        wqini_inp.symlink_to(WQWCRST_OUT)
-
-    import pdb;pdb.set_trace()
-    """
-
     out = runner.run_strict(data_map)
 
     return out
@@ -207,10 +179,11 @@ def fork(runner_base: Runner, size:int) -> List[Runner]:
     """
     copy_name_list = ["RESTART.OUT", "TEMPBRST.OUT", "WQWCRST.OUT"]
     runner_list = []
-    for i in range(size):
+    for _ in range(size):
         runner = Runner(runner_base.dst_root)
         for copy_name in copy_name_list:
             copy_locked(runner_base.dst_root / copy_name, runner.dst_root / copy_name)
+            assert (runner.dst_root / copy_name).exists(), "Strange bug?"
         runner_list.append(runner)
     return runner_list
 

@@ -19,7 +19,7 @@ class WAIT:
 class STOP:
     pass
 
-
+"""
 def ypool_worker(thread_idx, in_queue, out_queue):
     error = None
     while True:
@@ -38,6 +38,41 @@ def ypool_worker(thread_idx, in_queue, out_queue):
             break
         else:
             out_queue.put((idx, FAIL(error)))
+"""
+
+class YPoolThread(Thread):
+    def __init__(self, thread_idx, in_queue, out_queue):
+        super().__init__()
+        self.thread_idx = thread_idx
+        self.in_queue = in_queue
+        self.out_queue = out_queue
+
+        self.stoped = False
+
+    def stop(self):
+        self.stoped = True
+
+    def run(self):
+        thread_idx, in_queue, out_queue = self.thread_idx, self.in_queue, self.out_queue
+        error = None
+
+        while not self.stoped:
+            _in = in_queue.get()
+            if isinstance(_in, STOP):
+                return
+            idx, quota, func, arg = _in
+            # idx, quota, func, arg = in_queue.get()
+            for used_quota in range(quota):
+                try:
+                    res = func(arg)
+                except Exception as e: # TODO: Add some limitation
+                    warn(f"worker {thread_idx} task: {idx} (quota:{quota-used_quota-1}/{quota}) fail due to: {e}")
+                    error = e
+                    continue
+                out_queue.put((idx, res))
+                break
+            else:
+                out_queue.put((idx, FAIL(error)))
 
 
 class YPool:
@@ -76,12 +111,15 @@ class YPool:
 
         thread_list = []
         for thread_idx in range(self.pool_size):
-            thread = Thread(target=ypool_worker, args=(thread_idx, in_queue, out_queue))
+            # thread = Thread(target=ypool_worker, args=(thread_idx, in_queue, out_queue))
+            thread = YPoolThread(thread_idx, in_queue, out_queue)
             thread.start()
             thread_list.append(thread)
 
         for idx, arg in enumerate(iterable):
             in_queue.put((idx, self.quota, func, arg)) # queue size is infinite
+        for _ in range(self.pool_size):
+            in_queue.put(STOP())
 
         try:
             completed = 0
@@ -92,9 +130,12 @@ class YPool:
                 res_list[idx] = res
                 completed += 1
         finally:
-
+            """
             for _ in range(self.pool_size):
                 in_queue.put(STOP())
+            """
+            for thread in thread_list:
+                thread.stop()
             
             #"""
             for thread in thread_list:

@@ -225,7 +225,7 @@ class Tsundere:
             raise Baka("Tsundere: Baka")
         return True
 
-def test_ypool_poor_tsundere():
+def test_ypool_tsundere():
     pool = YPool(3, quota=3)
     for hp in [2, 3]:
         # poor Tsundere
