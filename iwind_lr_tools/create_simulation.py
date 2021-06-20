@@ -2,7 +2,7 @@
 This module provide both function which should be called from REPL and a CLI based on clize
 """
 
-from .utils import symlink_locked
+from .utils import copy_locked, symlink_locked
 from os import symlink
 from pathlib import Path
 import shutil
@@ -46,8 +46,10 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None,
         # method 0 (x)
         #dst.symlink_to(src)
         # This race-condition shit waste my a lot of time. 
+        """
         symlink_locked(src, dst)
         assert src.is_file(), "Created symlink failed?????"
+        """
         #"""
         """
         # method 1 (x)
@@ -56,10 +58,10 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None,
         else:
             shutil.copy(src, dst)
         """
-        """
+        
         # method 2 (x)
-        shutil.copy(src, dst)
-        """
+        # shutil.copy(src, dst)
+        copy_locked(dst, src)
 
     if verbose:
         print(f"Done: Symbolinking all files from {target_root} to {origin_root}")

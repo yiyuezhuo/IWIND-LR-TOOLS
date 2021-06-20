@@ -4,6 +4,7 @@ import subprocess
 from threading import Lock
 from tempfile import mkdtemp
 import pandas as pd
+import shutil
  
 def path_to_lines(func):
     def _func(p):
@@ -32,7 +33,8 @@ def run_simulation(root: str, popen=False):
     cwd = str(root)
     if popen:
         return subprocess.Popen(command, cwd=cwd)
-    return subprocess.run(command, cwd=cwd)
+    # return subprocess.run(command, cwd=cwd)
+    return subprocess.check_output(command, cwd=cwd)
 
 def open_safe(path, mode, **kwargs):
     # Prevent symbolic link occastionally rewrite to the orignal file
@@ -54,3 +56,12 @@ def symlink_locked(src:Path, dst:Path):
     with symlink_lock:
         src.symlink_to(dst)
 
+copy_lock = Lock()
+
+def copy_locked(src, dst):
+    with copy_lock:
+        shutil.copy(src, dst)
+
+class YPool:
+    def __self__(self, pool_size):
+        pass
