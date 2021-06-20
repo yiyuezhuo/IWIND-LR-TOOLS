@@ -46,10 +46,10 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None,
         # method 0 (x)
         #dst.symlink_to(src)
         # This race-condition shit waste my a lot of time. 
-        """
+        #"""
         symlink_locked(src, dst)
         assert src.is_file(), "Created symlink failed?????"
-        """
+        #"""
         #"""
         """
         # method 1 (x)
@@ -61,7 +61,7 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None,
         
         # method 2 (x)
         # shutil.copy(src, dst)
-        copy_locked(dst, src)
+        # copy_locked(dst, src)
 
     if verbose:
         print(f"Done: Symbolinking all files from {target_root} to {origin_root}")

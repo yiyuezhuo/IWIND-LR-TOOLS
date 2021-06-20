@@ -7,6 +7,8 @@ is able to run (a new human- file may be required).
 pytest refactored versopn
 """
 
+import pytest
+
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory, mkdtemp
@@ -18,6 +20,7 @@ from iwind_lr_tools import Actioner, Runner, run_batch, Runner, restart_batch
 # import iwind_lr_tools
 from iwind_lr_tools.runner import data_map_fill #, append_out_map
 from iwind_lr_tools.collector import dumpable_list, get_all
+from iwind_lr_tools.fault_tolerant_pool import YPool
 
 MIN_SIMULATION_TIME = 1.0 # It seeems that there's round in the model program, 0.9 -> 0, 1.5 -> 1 etc.
 
@@ -128,8 +131,9 @@ def test_more_time_sanity_check():
 
         compare_out_map(out_map, out_map_1plus, neq=True)
 
+# @pytest.mark.xfail()
 def test_environment_isolation():
-    return # disable this test for all-copying method
+    # return # disable this test for all-copying method
     root, data, data_map, df_node_map_map, df_map_map, actioner = name_suit()
     
     data_map_list = [
@@ -207,3 +211,30 @@ def test_restart():
 
         compare_out_map(out_map, out_map_cont)
     """
+
+class Baka(Exception):
+    pass
+
+class Tsundere:
+    def __init__(self, hp):
+        self.hp = hp
+    
+    def __call__(self, arg):
+        self.hp -= 1
+        if self.hp > 0:
+            raise Baka("Tsundere: Baka")
+        return True
+
+def test_ypool_poor_tsundere():
+    pool = YPool(3, quota=3)
+    for hp in [2, 3]:
+        # poor Tsundere
+        func = Tsundere(hp)
+        with pytest.warns(UserWarning):
+            assert len(pool.map(func, [1])) >  0
+
+    # strong Tsundere
+    func = Tsundere(4)
+    with pytest.raises(Exception): # For some reasons, `pytest.raises(Baka)` doesn't works.
+        with pytest.warns(UserWarning):
+            pool.map(func, [1])

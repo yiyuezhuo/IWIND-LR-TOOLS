@@ -5,7 +5,8 @@
 from typing import List
 from pathlib import Path
 from shutil import rmtree
-from multiprocessing.dummy import Pool
+# from multiprocessing.dummy import Pool
+from .fault_tolerant_pool import YPool as Pool
 from multiprocessing import cpu_count
 import pandas as pd
 import os
@@ -91,6 +92,7 @@ class Runner:
 
     def check_shell_output(self, shell_output:str):
         # TODO: do some check to raise error as early as possible
+        # The parsing will fail if model itself failed to complete.
         self.shell_output_parsed_list.append(parse_shell_output(shell_output))
 
     def __repr__(self):

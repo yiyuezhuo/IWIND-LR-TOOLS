@@ -51,10 +51,14 @@ def plot_two_y(x, y1, y2, x_label="x", y1_label=None, y2_label=None, alpha=0.9, 
     ax1.set_ylabel(y1_label, color='green')
     ax2.set_ylabel(y2_label, color='blue')
 
-def plot_aligned_df_compare(df, key1, key2, alpha=0.9):
-    x_label = "date" if "date" in df else "time"
-
-    x = df[x_label]
+def plot_aligned_df_compare(df, key1, key2, alpha=0.9, x_label=None):
+    if x_label is None and df.index.name == "date":
+        x_label = "date"
+        x = df.index
+    else:
+        if x_label is None:
+            x_label = "date" if "date" in df else "time"
+        x = df[x_label]
     y1 = df[key1]
     y2 = df[key2]
 

@@ -1,11 +1,12 @@
 
 import pandas as pd
 import numpy as np
+from warnings import warn
 
 
 def get_time_indexed_df(df:pd.DataFrame, time_key:str, dt:pd.Timestamp):
     df = df.set_index(dt + pd.TimedeltaIndex(df[time_key], unit="D")).resample("H").nearest()
-    df.index = df.index.rename("time")
+    df.index = df.index.rename("date")
     return df
 
 def get_time_aligned_map(data_map, df_node_map_map, df_map_map, out_map=None, dt:pd.Timestamp=None):
@@ -13,6 +14,7 @@ def get_time_aligned_map(data_map, df_node_map_map, df_map_map, out_map=None, dt
     Align time
     """
     if dt is None:
+        warn("While it is possible to use a default dt value to create a relative timestamp, it is recommented to explicity specify one.")
         dt = pd.to_datetime("1989-6-4")
 
     rd = {}

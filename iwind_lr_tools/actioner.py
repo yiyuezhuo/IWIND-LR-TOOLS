@@ -207,7 +207,6 @@ class Actioner:
             name_list.append(node_list[idx].get_name())
         return name_list
 
-
     def get_flow_node_list(self):
         return FlowNode.get_df_node_list(self.data_map["qser.inp"])
 
@@ -218,6 +217,7 @@ class Actioner:
         return (self.data_map, self.df_node_map_map, self.df_map_map)
 
     def copy(self):
+        # TODO: find a way to speed it up while still be correct.
         return deepcopy(self)
 
     def set_flow_range(self, flow_key, value, time_begin, time_end):

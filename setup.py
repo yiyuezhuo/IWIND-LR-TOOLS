@@ -7,7 +7,7 @@ with open("requirements.txt") as f:
 
 setup(
     name='IWIND-LR-TOOLS',
-    version='0.0.3',
+    version='0.0.4',
     url='https://github.com/yiyuezhuo/IWIND-LR-TOOLS.git',
     author='yiyuezhuo',
     author_email='yiyuezhuo@gmail.com',
