@@ -4,6 +4,7 @@ import pandas as pd
 from typing import List
 from warnings import warn
 from copy import deepcopy
+from collections.abc import Iterable
 
 from .collector import inp_out_map, get_df_node_map_map_and_df_map_map
 from .io import qser_inp
@@ -219,8 +220,13 @@ class Actioner:
     def copy(self):
         # TODO: find a way to speed it up while still be correct.
         return deepcopy(self)
+        """
+        actioner = Actioner(deepcopy(self.data_map), {}, {})
+        actioner.sync_from_data_map()
+        return actioner
+        """
 
-    def set_flow_range(self, flow_key, value, time_begin, time_end):
+    def _get_df_index(self, flow_key, time_begin, time_end):
         df = self.df_map_map["qser.inp"][flow_key]
 
         if time_begin is None:
@@ -234,24 +240,34 @@ class Actioner:
 
         idx_begin = 2 * time_begin
         idx_end = 2 * time_end
-        
+
         index = df.index[idx_begin: idx_end]
+
+        return df, index
+
+    def set_flow_range(self, flow_key, value, time_begin, time_end):
+        
+        df, index = self._get_df_index(flow_key, time_begin, time_end)
+        
         df.loc[index, "flow"] = value
 
     def set_flow_range_to_0(self, flow_key, time_begin, time_end):
         self.set_flow_range(flow_key, 0, time_begin, time_end)
 
     def set_flow_range_from_actioner(self, flow_key, actioner, time_begin, time_end):
-        df = self.df_map_map["qser.inp"][flow_key]
         df_target = actioner.df_map_map["qser.inp"][flow_key]
 
-        if time_begin is None:
-            time_begin = 0
-        if time_end is None:
-            time_end = df.shape[0] // 2
-
-        idx_begin = 2 * time_begin
-        idx_end = 2 * time_end
-
-        index = df.index[idx_begin: idx_end]
+        df, index = self._get_df_index(flow_key, time_begin, time_end)
         df.loc[index, "flow"] = df_target.loc[index, "flow"]
+
+    def set_flow_range_from_vector(self, flow_key, vector, time_begin, time_end):
+        df, index = self._get_df_index(flow_key, time_begin, time_end)
+        df.loc[index, "flow"] = df.loc[index, "flow"] * vector
+
+    def __repr__(self):
+        return f"Actioner(id={id(self)}, is_restarting={self.is_restarting()}, simulation_length={self.get_simulation_length()}, simulation_begin_time={self.get_simulation_begin_time()})"
+
+    def copy_1day_plus(self):
+        cloned = self.copy()
+        cloned.set_simulation_length(self.get_simulation_length() + 1)
+        return cloned
