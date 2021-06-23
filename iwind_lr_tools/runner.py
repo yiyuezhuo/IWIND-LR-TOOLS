@@ -10,6 +10,8 @@ from shutil import rmtree
 from multiprocessing import cpu_count
 import pandas as pd
 import os
+from contextlib import contextmanager
+from warnings import warn
 
 from .fault_tolerant_pool import YPool as Pool
 from .io.common import Node, dumps
@@ -46,7 +48,7 @@ class Runner:
     Create a new environment, replace some *inp with the one proposed by optimizer and fetch result.
     """
 
-    def __init__(self, src_root, dst_root=None, without_create_simulation=False):
+    def __init__(self, src_root, dst_root=None, without_create_simulation=False, verbose=True):
         self.shell_output_list = []
         self.shell_output_parsed_list = []
 
@@ -61,6 +63,8 @@ class Runner:
 
             self.dst_root = Path(dst_root)
             create_simulation(src_root, dst_root)
+        
+        self.verbose = verbose
 
     def write(self, data_map:dict):
         # {"efdc.inp": efdc_node_list: List[Node], ....}
@@ -91,6 +95,8 @@ class Runner:
     def cleanup(self):
         # user may want to keep those files
         rmtree(self.dst_root)
+        if self.verbose:
+            print(f"cleanup {self.dst_root}")
 
     def check_shell_output(self, shell_output:str):
         # TODO: do some check to raise error as early as possible
@@ -174,9 +180,23 @@ def work_restart(process_args: dict):
     if wqini_inp.exists():
         wqini_inp.unlink()
 
+    """
+    print(f"try rename {RESTART_OUT} -> {RESTART_INP}")
+    print(f"try rename {TEMPBRST_OUT} -> {TEMPB_RST}")
+    print(f"try rename {WQWCRST_OUT} -> {wqini_inp}")
+
     RESTART_OUT.rename(RESTART_INP)
     TEMPBRST_OUT.rename(TEMPB_RST)
     WQWCRST_OUT.rename(wqini_inp)
+
+    print(f"rename {RESTART_OUT} -> {RESTART_INP}")
+    print(f"rename {TEMPBRST_OUT} -> {TEMPB_RST}")
+    print(f"rename {WQWCRST_OUT} -> {wqini_inp}")
+    """
+    
+    copy_locked(RESTART_OUT, RESTART_INP)
+    copy_locked(TEMPBRST_OUT, TEMPB_RST)
+    copy_locked(WQWCRST_OUT, wqini_inp)
 
     out = runner.run_strict(data_map)
 
@@ -189,6 +209,7 @@ def copy_restart_files(src, dst):
     for copy_name in copy_name_list:
         copy_locked(src / copy_name, dst / copy_name)
         assert (dst / copy_name).exists(), "Strange bug?"
+        print("copied", src / copy_name, "=>", dst / copy_name)
 
 def fork(runner_base: Runner, size:int) -> List[Runner]:
     """
@@ -205,6 +226,7 @@ def fork(runner_base: Runner, size:int) -> List[Runner]:
         """
         copy_restart_files(runner_base.dst_root, runner.dst_root)
         runner_list.append(runner)
+        print(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
     return runner_list
 
 def restart_batch(runner_list:List[Runner], data_map_list, pool_size=None):
@@ -302,8 +324,11 @@ def restart_iterator_1day_plus(begin_day, end_day, runner_completed: Runner, act
             df = get_aligned_df(*actioner.to_data(), out_map, dropna=dropna, dt=dt)
             df_1day_plus = get_aligned_df(*actioner_1day_plus.to_data(), out_map_1day_plus, dropna=dropna, dt=dt)
             # yield df.append(df_1day_plus.iloc[-24:-23])
-            assert df.equals(df_1day_plus[:-24])
-            yield df_1day_plus[-23:]
+            # assert df.equals(df_1day_plus[:-24])
+            if not df.equals(df_1day_plus[:-24]):
+                warn(f"Internal consistency check failed: df - df_1day_plus[:-24] = {df - df_1day_plus[:-24]}")
+            
+            yield df_1day_plus[:-23]
 
         processing_begin_day = processing_begin_day + simulation_length
 
@@ -358,10 +383,27 @@ def start_iterator_1day_plus(begin_day, end_day, root, actioner_frozen:Actioner,
     else:
         df = get_aligned_df(*actioner.to_data(), out_map, dt=dt)
         df_1day_plus = get_aligned_df(*actioner_1day_plus.to_data(), out_map_1day_plus, dt=dt)
-        assert df.equals(df_1day_plus[:-24])
+        # assert df.equals(df_1day_plus[:-24])
+        if not df.equals(df_1day_plus[:-24]):
+            warn(f"Internal consistency check failed: df - df_1day_plus[:-24] = {df - df_1day_plus[:-24]}")
+        
         yield df_1day_plus[-23:]
     
     yield from restart_iterator_1day_plus(begin_day + step, end_day, runner_completed, actioner_frozen,
                 step=step, yield_out_map=yield_out_map, dropna=dropna, dt=dt,
                 debug_list=debug_restart_list)
 
+@contextmanager
+def debug_env(debug_list=None, protect=None):
+    if debug_list is None:
+        _debug_list = []
+    else:
+        _debug_list = debug_list
+
+    yield _debug_list
+
+    if debug_list is None:
+        protect_set = set(protect) if protect is not None else set()
+        for idx, runner in enumerate(_debug_list):
+            if idx not in protect_set:
+                runner.cleanup()

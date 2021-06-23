@@ -262,7 +262,7 @@ class Actioner:
 
     def set_flow_range_from_vector(self, flow_key, vector, time_begin, time_end):
         df, index = self._get_df_index(flow_key, time_begin, time_end)
-        df.loc[index, "flow"] = df.loc[index, "flow"] * vector
+        df.loc[index, "flow"] = df.loc[index, "flow"] * vector.to_numpy().repeat(2, axis=0)[index]
 
     def __repr__(self):
         return f"Actioner(id={id(self)}, is_restarting={self.is_restarting()}, simulation_length={self.get_simulation_length()}, simulation_begin_time={self.get_simulation_begin_time()})"
@@ -271,3 +271,20 @@ class Actioner:
         cloned = self.copy()
         cloned.set_simulation_length(self.get_simulation_length() + 1)
         return cloned
+
+    def set_flow_by_decision_df(self, decision_df: pd.DataFrame, time_begin=None, time_end=None):
+        for flow_key, vec in decision_df.items():
+            self.set_flow_range_from_vector(flow_key, vec, time_begin, time_end)
+
+    def set_begin_length_flow(self, begin_time, simulation_days, decision_df, time_begin=None, time_end=None):
+        """
+        decision_df:
+                    pump_key    inflow_A
+        0 (hour)    0.0         1.0
+        1 (h)       0.0         1.0
+        2           1.0         0.0
+        ...
+        """
+        self.set_simulation_begin_time(begin_time)
+        self.set_simulation_length(simulation_days)
+        self.set_flow_by_decision_df(decision_df)
