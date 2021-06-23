@@ -15,8 +15,9 @@ from tempfile import TemporaryDirectory, mkdtemp
 from contextlib import contextmanager
 import shutil
 from typing import List
+import pandas as pd
 
-from iwind_lr_tools import Actioner, Runner, run_batch, Runner, restart_batch
+from iwind_lr_tools import Actioner, Runner, run_batch, Runner, restart_batch, fork, start_iterator_1day_plus
 # import iwind_lr_tools
 from iwind_lr_tools.runner import data_map_fill #, append_out_map
 from iwind_lr_tools.collector import dumpable_list, get_all
@@ -106,6 +107,12 @@ def compare_out_map(out_map1, out_map2, neq=False):
         else:
             assert not out_map1[key].equals(out_map2[key])
 
+def compare_out_map_weak(out_map1, out_map2):
+    assert set(out_map1) == set(out_map2)
+
+    for key in out_map1.keys():
+        assert out_map1[key].shape[0] > 1
+        assert out_map1[key].shape == out_map2[key].shape
 
 def test_projection():
     with create_environment_fast_only(ori_root) as root:
@@ -186,7 +193,7 @@ def test_select_flow():
         for i in range(2, len(mode_list)):
             compare_out_map(out_map_list[1], out_map_list[i])
 
-def test_restart():
+def test_restart_too_strong():
     # TODO: Due to numerical and output format problem, this test is disabled at this time.
     """
     root, data, data_map, df_node_map_map, df_map_map, actioner = name_suit()
@@ -211,6 +218,44 @@ def test_restart():
 
         compare_out_map(out_map, out_map_cont)
     """
+
+def test_restart_fork():
+    root, data, data_map, df_node_map_map, df_map_map, actioner = name_suit()
+
+    with debug_env() as debug_list:
+        run_batch(root, [actioner], pool_size=1, debug_list=debug_list)
+        runner_base = debug_list[0]
+        runner_list = fork(runner_base, 2)
+        actioner_base = actioner
+        actioner_list = []
+        for _ in range(2):
+            actioner = actioner_base.copy()
+            actioner.set_simulation_begin_time(actioner_base.get_simulation_begin_time() + MIN_SIMULATION_TIME)
+            actioner.enable_restart()
+            actioner_list.append(actioner)
+        out_map_list = restart_batch(runner_list, actioner_list, pool_size=2)
+        compare_out_map_weak(out_map_list[0], out_map_list[1])
+
+def test_start_iterator_1day_plus():
+    root, data, data_map, df_node_map_map, df_map_map, actioner = name_suit()
+    begin_day = actioner.get_simulation_begin_time()
+    end_day = begin_day + 2 * MIN_SIMULATION_TIME
+    actioner_frozen = actioner
+
+    dt_dummy = pd.to_datetime("1911-10-10")
+    days = actioner.get_simulation_begin_time()
+
+    it = start_iterator_1day_plus(begin_day, end_day, root, actioner_frozen, step=1, dt=dt_dummy)
+    df = next(it)
+    assert df.index[0] == dt_dummy + pd.DateOffset(int(days))
+    assert df.index[-1].hour == 23
+    df = next(it)
+    assert df.index[0] == dt_dummy + pd.DateOffset(int(days + 1))
+    assert df.index[-1].hour == 23
+    i = 0
+    for _ in it:
+        i += 1
+    assert i == 0
 
 class Baka(Exception):
     pass

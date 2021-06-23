@@ -160,6 +160,7 @@ def run_batch(root, data_map_list, pool_size=0, debug_list=None, dst_root_list=N
     else:
         return [work(process_arg) for process_arg in process_args_list]
 
+
 def work_restart(process_args: dict):
     # TODO: An valuable altnative implementation is to just rename three files rather than symbolic link
     runner: Runner = process_args["runner"]
@@ -179,20 +180,6 @@ def work_restart(process_args: dict):
         TEMPB_RST.unlink()
     if wqini_inp.exists():
         wqini_inp.unlink()
-
-    """
-    print(f"try rename {RESTART_OUT} -> {RESTART_INP}")
-    print(f"try rename {TEMPBRST_OUT} -> {TEMPB_RST}")
-    print(f"try rename {WQWCRST_OUT} -> {wqini_inp}")
-
-    RESTART_OUT.rename(RESTART_INP)
-    TEMPBRST_OUT.rename(TEMPB_RST)
-    WQWCRST_OUT.rename(wqini_inp)
-
-    print(f"rename {RESTART_OUT} -> {RESTART_INP}")
-    print(f"rename {TEMPBRST_OUT} -> {TEMPB_RST}")
-    print(f"rename {WQWCRST_OUT} -> {wqini_inp}")
-    """
     
     copy_locked(RESTART_OUT, RESTART_INP)
     copy_locked(TEMPBRST_OUT, TEMPB_RST)
@@ -201,6 +188,7 @@ def work_restart(process_args: dict):
     out = runner.run_strict(data_map)
 
     return out
+
 
 def copy_restart_files(src, dst):
     src = Path(src)
@@ -219,11 +207,6 @@ def fork(runner_base: Runner, size:int) -> List[Runner]:
     runner_list = []
     for _ in range(size):
         runner = Runner(runner_base.dst_root)
-        """
-        for copy_name in copy_name_list:
-            copy_locked(runner_base.dst_root / copy_name, runner.dst_root / copy_name)
-            assert (runner.dst_root / copy_name).exists(), "Strange bug?"
-        """
         copy_restart_files(runner_base.dst_root, runner.dst_root)
         runner_list.append(runner)
         print(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
@@ -387,7 +370,7 @@ def start_iterator_1day_plus(begin_day, end_day, root, actioner_frozen:Actioner,
         if not df.equals(df_1day_plus[:-24]):
             warn(f"Internal consistency check failed: df - df_1day_plus[:-24] = {df - df_1day_plus[:-24]}")
         
-        yield df_1day_plus[-23:]
+        yield df_1day_plus[:-23]
     
     yield from restart_iterator_1day_plus(begin_day + step, end_day, runner_completed, actioner_frozen,
                 step=step, yield_out_map=yield_out_map, dropna=dropna, dt=dt,
