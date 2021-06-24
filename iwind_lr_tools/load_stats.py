@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from warnings import warn
 
+from .actioner import Actioner
+
 
 def get_time_indexed_df(df:pd.DataFrame, time_key:str, dt:pd.Timestamp):
     df = df.set_index(dt + pd.TimedeltaIndex(df[time_key], unit="D")).resample("H").nearest()
@@ -32,6 +34,9 @@ def get_time_aligned_map(data_map, df_node_map_map, df_map_map, out_map=None, dt
             WQWCTS_OUT[key] = get_time_indexed_df(df, "TIME", dt)
             # WQWCTS_OUT[key] = sdf.rolling(2).mean().shift(-1).dropna()
         rd["WQWCTS.OUT"] = WQWCTS_OUT
+
+        cumu_struct_outflow_out = get_time_indexed_df(out_map["cumu_struct_outflow.out"], "Jday", dt)
+        rd["cumu_struct_outflow.out"] = cumu_struct_outflow_out
     
     wqpsc_inp = {}
     for flow_name, df in df_map_map["wqpsc.inp"].items():
@@ -42,7 +47,7 @@ def get_time_aligned_map(data_map, df_node_map_map, df_map_map, out_map=None, dt
     for flow_name, df in df_map_map["qser.inp"].items():
         qser_inp[flow_name] = get_time_indexed_df(df.iloc[::2], "time", dt)
     rd["qser.inp"] = qser_inp
-    
+
     return rd
 
 def diff(ser:pd.Series) -> pd.Series:
@@ -131,6 +136,12 @@ def get_aligned_series_list(data_map, df_node_map_map, df_map_map, out_map=None,
                 ser = roll(df[wq_key])
                 ser_list.append(ser.rename(key))
 
+        for key, ser in aligned_map["cumu_struct_outflow.out"].items():
+            if key == "Jday":
+                continue
+            ser = diff(ser)
+            ser_list.append(ser.rename("struct_" + ser.name))
+
     for flow_key, df in aligned_map["wqpsc.inp"].items():
         for wq_key in wq_keys:
             key = f"{wq_key}_{flow_key}"
@@ -146,7 +157,6 @@ def get_aligned_series_list(data_map, df_node_map_map, df_map_map, out_map=None,
 
     return ser_list
 
-
 def get_aligned_df(data_map, df_node_map_map, df_map_map, out_map=None, *, dropna=True, **kwargs):
     ser_list = get_aligned_series_list(data_map, df_node_map_map, df_map_map, out_map=out_map, **kwargs)
     # TODO: keep only time overlap part? Set all index to the same name?
@@ -155,20 +165,20 @@ def get_aligned_df(data_map, df_node_map_map, df_map_map, out_map=None, *, dropn
         df = df.dropna()
     return df
 
-def stats_load(df, df_ori, wq_key, flow_key_list, qctlo_key="qctlo", pump_key="pump_outflow"):
+def stats_load(df, df_limit, wq_key, flow_keys, qctlo_key="qctlo", pump_key="pump_outflow"):
     """
     df_ori should has un-modified qser.
     """
     
     dd = {}
     dd[f"load_{qctlo_key}"] = df[f"{wq_key}_{qctlo_key}"] * df[f"flow_{qctlo_key}"]
-    for flow_key in flow_key_list:
-        diff = df_ori[f"flow_{flow_key}"] - df[f"flow_{flow_key}"]
+    for flow_key in flow_keys:
+        diff = df_limit[f"flow_{flow_key}"] - df[f"flow_{flow_key}"]
         dd[f"load_{flow_key}"] = df[f"{wq_key}_{flow_key}"] * diff
     dd[f"load_{pump_key}"] = df[f"flow_{pump_key}"] * df[f"{wq_key}_{pump_key}"]
 
     rdf = pd.DataFrame(dd)
-    rdf["load_flow"] = rdf[[f"load_{flow_key}" for flow_key in flow_key_list]].sum(axis=1)
+    rdf["load_flow"] = rdf[[f"load_{flow_key}" for flow_key in flow_keys]].sum(axis=1)
     rdf["load_total"] = rdf[f"load_{qctlo_key}"] + rdf["load_flow"] + rdf[f"load_{pump_key}"]
     return rdf
 
@@ -178,3 +188,65 @@ def append_df(df_left, df_right):
     But this function doesn't facilitate this info.
     """
     return df_left.append(df_right).resample("H").interpolate()
+
+
+class Pedant:
+    """
+    A Pedant is a man who just want to attach everything with a timestamp.
+
+    `postprocess` will add some specific data related columns to df which is used by `get_load_df`.
+    """
+    def __init__(self, dt: pd.Timestamp, *, wq_keys=None, aser_keys=None, smooth_wqpsc_inp=True, dropna=True,
+                postprocess=None,
+                df_limit=None, wq_key=None, flow_keys=None, qctlo_key="qctlo", pump_key="pump_outflow",
+                total_begin_time=None):
+        self.dt = dt
+
+        self.wq_keys = wq_keys
+        self.aser_keys = aser_keys
+        self.smooth_wqpsc_inp = smooth_wqpsc_inp
+        self.dropna = dropna
+
+        self.postprocess = postprocess if postprocess is not None else lambda df:df
+ 
+        self.df_limit = df_limit
+        self.wq_key = wq_key
+        self.flow_keys= flow_keys
+
+        self.qctlo_key = qctlo_key
+        self.pump_key = pump_key
+
+        self.total_begin_time = int(total_begin_time) if total_begin_time is not None else None
+
+    def get_df(self, actioner:Actioner, out_map=None):
+        """
+        There're three kinds of df:
+        * Given actioner only
+        * Given actioner and out_map
+        * Given actioner, out_map and pedant has a non-trival postprocess
+
+        Only The last one can be passed to get_load_df to get a valid load_df.
+        """
+        df = get_aligned_df(*actioner.to_data(), out_map, dt=self.dt, 
+            wq_keys=self.wq_keys, aser_keys=self.aser_keys, smooth_wqpsc_inp=self.smooth_wqpsc_inp,
+            dropna=self.dropna)
+        df = self.postprocess(df)
+        return df
+
+    def get_df_load(self, df):
+        assert self.get_load_df_ready()
+        return stats_load(df, self.df_limit, self.wq_key, self.flow_keys, 
+            qctlo_key=self.qctlo_key, pump_key=self.pump_key)
+
+    def get_load_df_ready(self):
+        return self.df_limit is not None and self.wq_key is not None and self.flow_keys is not None
+
+    def __repr__(self):
+        return f"Pedant(id={id(self)}, dt={self.dt}, postprocess={self.postprocess}, get_load_df_ready->{self.get_load_df_ready()}, total_begin_time={self.total_begin_time})"
+
+    def hour_to_dt(self, hours):
+        return self.dt + pd.DateOffset(days=self.total_begin_time) + pd.DateOffset(hours=int(hours))
+
+    def dt_to_hour(self, dt):
+        offset = dt - self.dt - pd.DateOffset(days=self.total_begin_time)
+        return offset.hours

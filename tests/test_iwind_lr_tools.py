@@ -17,7 +17,7 @@ import shutil
 from typing import List
 import pandas as pd
 
-from iwind_lr_tools import Actioner, Runner, run_batch, Runner, restart_batch, fork, start_iterator_1day_plus
+from iwind_lr_tools import Actioner, Runner, run_batch, Runner, restart_batch, fork
 # import iwind_lr_tools
 from iwind_lr_tools.runner import data_map_fill #, append_out_map
 from iwind_lr_tools.collector import dumpable_list, get_all
@@ -105,7 +105,11 @@ def compare_out_map(out_map1, out_map2, neq=False):
             assert out_map1[key].shape == out_map2[key].shape
             assert out_map1[key].equals(out_map2[key])
         else:
-            assert not out_map1[key].equals(out_map2[key])
+            if key == "cumu_struct_outflow.out":
+                if not out_map1["qbal.out"]["qctlo(million-m3)"].equals(out_map2["qbal.out"]["qctlo(million-m3)"]):
+                    assert not out_map1[key].equals(out_map2[key])
+            else:
+                assert not out_map1[key].equals(out_map2[key])
 
 def compare_out_map_weak(out_map1, out_map2):
     assert set(out_map1) == set(out_map2)
@@ -234,8 +238,11 @@ def test_restart_fork():
             actioner.enable_restart()
             actioner_list.append(actioner)
         out_map_list = restart_batch(runner_list, actioner_list, pool_size=2)
-        compare_out_map_weak(out_map_list[0], out_map_list[1])
+        # compare_out_map_weak(out_map_list[0], out_map_list[1])
+        compare_out_map(out_map_list[0], out_map_list[1])
 
+"""
+@pytest.mark.xfail()
 def test_start_iterator_1day_plus():
     root, data, data_map, df_node_map_map, df_map_map, actioner = name_suit()
     begin_day = actioner.get_simulation_begin_time()
@@ -256,6 +263,7 @@ def test_start_iterator_1day_plus():
     for _ in it:
         i += 1
     assert i == 0
+"""
 
 class Baka(Exception):
     pass

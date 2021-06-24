@@ -2,6 +2,7 @@
 Collect interested files
 """
 
+from iwind_lr_tools.io import cumu_struct_outflow_out
 from iwind_lr_tools.io.common import DataFrameNode, FlowNode, ConcentrationNode
 from pathlib import Path
 import pandas as pd
@@ -51,7 +52,8 @@ inp_map = {
 
 out_map = {
     "qbal.out": qbal_out, # general stats
-    "WQWCTS.OUT": WQWCTS_OUT # concenteration of outflow time series
+    "WQWCTS.OUT": WQWCTS_OUT, # concenteration of outflow time series
+    "cumu_struct_outflow.out": cumu_struct_outflow_out, # outflow for every overflow point
 }
 
 has_df_map_list = ["efdc.inp", "qser.inp", "wqpsc.inp", "wq3dwc.inp"]

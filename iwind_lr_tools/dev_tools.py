@@ -16,10 +16,10 @@ from copy import deepcopy
 import pickle
 
 from iwind_lr_tools import create_simulation, run_simulation, dumps, Actioner, Runner, run_batch, restart_batch, \
-    restart_iterator, restart_iterator_1day_plus, start_iterator, start_iterator_1day_plus
+    restart_iterator, start_iterator
 from .collector import get_all, get_model
 # from .load_stats import get_aligned_dict, get_aligned_df, stats_load, drop_obsession_edge_int, append_WQWCTS_OUT, drop_obsession_WQCTS_out
-from .load_stats import get_time_indexed_df, get_time_aligned_map, get_aligned_series_list, get_aligned_df, stats_load
+from .load_stats import get_time_indexed_df, get_time_aligned_map, get_aligned_series_list, get_aligned_df, stats_load, Pedant
 from .runner import fork
 
 # from .extract_non_modified_files import extract_non_modified_files
@@ -38,7 +38,7 @@ class Period:
 def zscore(x):
     return (x - x.mean()) / x.std()
 
-plt.rcParams["figure.figsize"] = [10, 6]
+plt.rcParams["figure.figsize"] = [12, 6]
 plt.rcParams['figure.facecolor'] = 'white'
 
 
@@ -65,15 +65,6 @@ def infer_x_axis(df, x_label=None):
 
 
 def plot_aligned_df_compare(df, key1, key2, alpha=0.9, x_label=None, markersize=6):
-    """
-    if x_label is None and df.index.name == "date":
-        x_label = "date"
-        x = df.index
-    else:
-        if x_label is None:
-            x_label = "date" if "date" in df else "time"
-        x = df[x_label]
-    """
     x, x_label = infer_x_axis(df, x_label)
     
     y1 = df[key1]
@@ -82,10 +73,6 @@ def plot_aligned_df_compare(df, key1, key2, alpha=0.9, x_label=None, markersize=
     plot_two_y(x, y1, y2, x_label=x_label, y1_label=key1, y2_label=key2, alpha=alpha, markersize=markersize)
 
 def plot_aligned_df_parallel(df, keys=None, normed=False, x_label=None, cov=None, cov_kwargs=None, **kwargs):
-    """
-    x_label = "date" if "date" in df else "time"
-    x = df[x_label]
-    """
     x, x_label = infer_x_axis(df, x_label)
 
     if keys is None:

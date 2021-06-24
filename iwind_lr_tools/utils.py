@@ -5,6 +5,7 @@ from threading import Lock
 from tempfile import mkdtemp
 import pandas as pd
 import shutil
+from warnings import warn
  
 def path_to_lines(func):
     def _func(p):
@@ -26,6 +27,17 @@ def get_exe_p(root: str):
     assert len(exe_p_list) == 1, "exe file missing or ambiguous, please leave exact 1."
     exe_p = exe_p_list[0]
     return exe_p
+
+exe_version = (4, 17)
+
+def check_exe_version_number(p: Path):
+    try:
+        major, minor = p.stem.split("ver").split(".")
+        assert major >= exe_version[0]
+        assert minor >= exe_version[1]
+    except:
+        warn(f"Checking version for {p} failed, expected version {exe_version}")
+
 
 def run_simulation(root: str, popen=False):
     exe_p = get_exe_p(root)

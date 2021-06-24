@@ -2,7 +2,6 @@
 
 """
 
-from iwind_lr_tools.load_stats import get_aligned_df
 from typing import List
 from pathlib import Path
 from shutil import rmtree
@@ -19,6 +18,7 @@ from .utils import copy_locked, open_safe, run_simulation, mkdtemp_locked
 from .create_simulation import create_simulation
 from .collector import parse_out, dumpable_list
 from .actioner import Actioner
+from .load_stats import Pedant
 
 
 def get_default_pool_size():
@@ -106,6 +106,14 @@ class Runner:
     def __repr__(self):
         return f"Ruuner(src_root={self.src_root}, dst_root={self.dst_root})"
 
+    def debug(self):
+        if len(self.shell_output_list) == 0:
+            print("No shell output is catched")
+        else:
+            if len(self.shell_output_list) > 1:
+                print("The size of collected shell output size > 1, show last shell output")
+            print(self.shell_output_list[-1])
+
 
 class RunnerInplace(Runner):
     """
@@ -165,41 +173,33 @@ def work_restart(process_args: dict):
     # TODO: An valuable altnative implementation is to just rename three files rather than symbolic link
     runner: Runner = process_args["runner"]
     data_map:dict = process_args["data_map"]
-    dst_root = runner.dst_root
-
-    RESTART_INP = dst_root / "RESTART.INP"
-    RESTART_OUT = dst_root / "RESTART.OUT"
-    TEMPB_RST = dst_root / "TEMPB.RST"
-    TEMPBRST_OUT = dst_root / "TEMPBRST.OUT"
-    wqini_inp = dst_root / "wqini.inp"
-    WQWCRST_OUT = dst_root  / "WQWCRST.OUT"
-
-    if RESTART_INP.exists():
-        RESTART_INP.unlink()
-    if TEMPB_RST.exists():
-        TEMPB_RST.unlink()
-    if wqini_inp.exists():
-        wqini_inp.unlink()
-    
-    copy_locked(RESTART_OUT, RESTART_INP)
-    copy_locked(TEMPBRST_OUT, TEMPB_RST)
-    copy_locked(WQWCRST_OUT, wqini_inp)
 
     out = runner.run_strict(data_map)
 
     return out
 
 
-def copy_restart_files(src, dst):
+def copy_restart_files(src, dst=None, verbose=True):
     src = Path(src)
-    dst = Path(dst)
-    copy_name_list = ["RESTART.OUT", "TEMPBRST.OUT", "WQWCRST.OUT"]
-    for copy_name in copy_name_list:
-        copy_locked(src / copy_name, dst / copy_name)
-        assert (dst / copy_name).exists(), "Strange bug?"
-        print("copied", src / copy_name, "=>", dst / copy_name)
+    dst = Path(dst) if dst is not None else src
 
-def fork(runner_base: Runner, size:int) -> List[Runner]:
+    out_to_inp = {
+        "RESTART.OUT": "RESTART.INP",
+        "TEMPBRST.OUT": "TEMPB.RST",
+        "WQWCRST.OUT": "wqini.inp"
+    }
+
+    for out_s, inp_s in out_to_inp.items():
+        src_p = src / out_s
+        dst_p = dst / inp_s
+        if dst_p.exists():
+            dst_p.unlink()
+        copy_locked(src_p, dst_p)
+        assert dst_p.exists(), "Strange bug?"
+        if verbose:
+            print("copied", src_p, "=>", dst_p)
+
+def fork(runner_base: Runner, size:int, verbose=True) -> List[Runner]:
     """
     Fork a executed runner into many runners.
     """
@@ -209,11 +209,21 @@ def fork(runner_base: Runner, size:int) -> List[Runner]:
         runner = Runner(runner_base.dst_root)
         copy_restart_files(runner_base.dst_root, runner.dst_root)
         runner_list.append(runner)
-        print(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
+        if verbose:
+            print(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
     return runner_list
+
+def check_is_restarting(data_map_or_actioner):
+    if isinstance(data_map_or_actioner, Actioner):
+        assert data_map_or_actioner.is_restarting()
+    elif isinstance(data_map_or_actioner, dict):
+        warn("Input is data_map instead of Actioner, is_restarting is not checked")
 
 def restart_batch(runner_list:List[Runner], data_map_list, pool_size=None):
     # runner_list can be obtained by `debug_list` in `run_batch`
+    for x in data_map_list:
+        check_is_restarting(x)
+    
     data_map_list = [x if isinstance(x, dict) else x.data_map for x in data_map_list]
 
     if pool_size is None:
@@ -233,13 +243,14 @@ def data_map_fill(data_map:dict):
     return data_map_filled
 
 def restart_iterator(begin_day, end_day, runner_completed: Runner, actioner_frozen:Runner, 
-                    step=7, yield_out_map=False, dropna=True, dt=None,
-                    debug_list=None):
+                    step=7, dropna=True, pedant: Pedant=None,
+                    debug_list=None, return_out_map=False):
     """
     This function will not modify *qser* and other detailed information, 
     as they're expected to be encoded in actioner_frozen already.
     So this function will not yield actioner since the caller can still use action_frozen as usual.
     """
+    
     actioner = actioner_frozen.copy()
     processing_begin_day = begin_day
 
@@ -259,10 +270,10 @@ def restart_iterator(begin_day, end_day, runner_completed: Runner, actioner_froz
         
         out_map, = restart_batch(runner_list, actioner_list, pool_size=1)
 
-        if yield_out_map:
+        if return_out_map:
             yield out_map
         else:
-            df = get_aligned_df(*actioner.to_data(), out_map, dropna=dropna, dt=dt)
+            df = pedant.get_df(actioner, out_map)
             yield df
 
         processing_begin_day = processing_begin_day + simulation_length
@@ -271,56 +282,8 @@ def restart_iterator(begin_day, end_day, runner_completed: Runner, actioner_froz
         for runner in runner_list:
             runner.cleanup()
 
-def restart_iterator_1day_plus(begin_day, end_day, runner_completed: Runner, actioner_frozen:Runner, 
-                            step=7, yield_out_map=False, dropna=True, dt=None,
-                            debug_list=None):
-    actioner = actioner_frozen.copy()
-    actioner_1day_plus = actioner_frozen.copy()
-
-    actioner.enable_restart()
-    actioner_1day_plus.enable_restart()
-
-    processing_begin_day = begin_day
-
-    runner_list = fork(runner_completed, 2)
-    actioner_list = [actioner, actioner_1day_plus]
-
-    if debug_list is not None:
-        debug_list.extend(runner_list)
-
-    while processing_begin_day < end_day:
-        simulation_length = min(end_day - processing_begin_day, step)
-
-        actioner.set_simulation_begin_time(processing_begin_day)
-        actioner.set_simulation_length(simulation_length)
-
-        actioner_1day_plus.set_simulation_begin_time(processing_begin_day)
-        actioner_1day_plus.set_simulation_length(simulation_length + 1)
-
-        copy_restart_files(runner_list[0].dst_root, runner_list[1].dst_root)
-        
-        out_map, out_map_1day_plus = restart_batch(runner_list, actioner_list, pool_size=2)
-
-        if yield_out_map:
-            yield out_map_1day_plus
-        else:
-            df = get_aligned_df(*actioner.to_data(), out_map, dropna=dropna, dt=dt)
-            df_1day_plus = get_aligned_df(*actioner_1day_plus.to_data(), out_map_1day_plus, dropna=dropna, dt=dt)
-            # yield df.append(df_1day_plus.iloc[-24:-23])
-            # assert df.equals(df_1day_plus[:-24])
-            if not df.equals(df_1day_plus[:-24]):
-                warn(f"Internal consistency check failed: df - df_1day_plus[:-24] = {df - df_1day_plus[:-24]}")
-            
-            yield df_1day_plus[:-23]
-
-        processing_begin_day = processing_begin_day + simulation_length
-
-    if debug_list is None:
-        for runner in runner_list:
-            runner.cleanup()
-
 def start_iterator(begin_day:int, end_day:int, root, actioner_frozen: Actioner,
-                    step=7, yield_out_map=False, dropna=True, dt=None,
+                    step=7, dropna=True, pedant:Pedant=None, return_out_map=False,
                     debug_list=None, debug_restart_list=None):
                     
     actioner = actioner_frozen.copy()
@@ -333,47 +296,13 @@ def start_iterator(begin_day:int, end_day:int, root, actioner_frozen: Actioner,
     out_map, = run_batch(root, [actioner], debug_list=debug_list)
     runner_completed = debug_list[0]
 
-    if yield_out_map:
+    if return_out_map:
         yield out_map
     else:
-        yield get_aligned_df(*actioner.to_data(), out_map, dt=dt)
+        yield pedant.get_df(actioner, out_map)
 
     yield from restart_iterator(begin_day + step, end_day, runner_completed, actioner_frozen,
-                step=step, yield_out_map=yield_out_map, dropna=dropna, dt=dt,
-                debug_list=debug_restart_list)
-
-def start_iterator_1day_plus(begin_day, end_day, root, actioner_frozen:Actioner,
-                    step=7, yield_out_map=False, dropna=True, dt=None,
-                    debug_list=None, debug_restart_list=None):
-
-    actioner = actioner_frozen.copy()
-    actioner.set_simulation_length(begin_day)
-    actioner.set_simulation_length(step)
-
-    actioner_1day_plus = actioner_frozen.copy()
-    actioner_1day_plus.set_simulation_length(begin_day)
-    actioner_1day_plus.set_simulation_length(step+1)
-
-    actioner_list = [actioner, actioner_1day_plus]
-
-    if debug_list is None:
-        debug_list = []
-    out_map, out_map_1day_plus = run_batch(root, actioner_list, debug_list=debug_list)
-    runner_completed = debug_list[0]
-
-    if yield_out_map:
-        yield out_map, out_map_1day_plus
-    else:
-        df = get_aligned_df(*actioner.to_data(), out_map, dt=dt)
-        df_1day_plus = get_aligned_df(*actioner_1day_plus.to_data(), out_map_1day_plus, dt=dt)
-        # assert df.equals(df_1day_plus[:-24])
-        if not df.equals(df_1day_plus[:-24]):
-            warn(f"Internal consistency check failed: df - df_1day_plus[:-24] = {df - df_1day_plus[:-24]}")
-        
-        yield df_1day_plus[:-23]
-    
-    yield from restart_iterator_1day_plus(begin_day + step, end_day, runner_completed, actioner_frozen,
-                step=step, yield_out_map=yield_out_map, dropna=dropna, dt=dt,
+                step=step, dropna=dropna, pedant=pedant,
                 debug_list=debug_restart_list)
 
 @contextmanager
@@ -390,3 +319,13 @@ def debug_env(debug_list=None, protect=None):
         for idx, runner in enumerate(_debug_list):
             if idx not in protect_set:
                 runner.cleanup()
+
+def start_single(begin_day, end_day, root, actioner_frozen:Actioner, **kwargs):
+    step = end_day - begin_day
+    it = start_iterator(begin_day, end_day, root, actioner_frozen, step=step, **kwargs)
+    return next(it)
+
+def restart_single(begin_day, end_day, runner_completed, actioner_frozen:Actioner, **kwargs):
+    step = end_day - begin_day
+    it = restart_iterator(begin_day, end_day, runner_completed, actioner_frozen, step=step, **kwargs)
+    return next(it)

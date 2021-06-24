@@ -23,9 +23,10 @@ class Actioner:
     def set_simulation_length(self, value):
         self.df_map_map["efdc.inp"]["C03"]["NTC"].iloc[0] = value
 
-    def enable_restart(self):
+    def enable_restart(self, enable=True):
         C02 = self.df_map_map["efdc.inp"]["C02"]
-        C02.loc[0, "ISRESTI"] = 1
+        val = 1 if enable else 0
+        C02.loc[0, "ISRESTI"] = val
 
     def is_restarting(self):
         C02 = self.df_map_map["efdc.inp"]["C02"]
@@ -288,3 +289,11 @@ class Actioner:
         self.set_simulation_begin_time(begin_time)
         self.set_simulation_length(simulation_days)
         self.set_flow_by_decision_df(decision_df)
+
+    def config_restart(self, *, begin_day, end_day, ddf):
+        self.enable_restart()
+        self.set_simulation_begin_time(begin_day)
+        self.set_simulation_length(end_day - begin_day)
+        self.set_flow_by_decision_df(ddf)
+
+
