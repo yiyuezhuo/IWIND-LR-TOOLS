@@ -49,7 +49,7 @@ def run_simulation(root: str, popen=False):
     return subprocess.check_output(command, cwd=cwd)
 
 def open_safe(path, mode, **kwargs):
-    # Prevent symbolic link occastionally rewrite to the orignal file
+    # Prevent symbolic link occasionally rewrite to the original file
     assert mode in {"w", "wb"}
     p = Path(path)
     if p.exists():

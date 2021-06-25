@@ -26,7 +26,8 @@ def get_time_aligned_map(data_map, df_node_map_map, df_map_map, out_map=None, dt
 
     if out_map is not None:
         qbal_out = get_time_indexed_df(out_map["qbal.out"], "jday", dt)
-        # qbal_out = (qbal_out.shift(-1) - qbal_out).dropna()
+        # qbal_out = (qbal_out.shift(-1) - 
+        # _out).dropna()
         rd["qbal.out"] = qbal_out
 
         WQWCTS_OUT = {}
@@ -77,7 +78,7 @@ def roll(ser:pd.Series) -> pd.Series:
 def fluctuation_smooth(seq: pd.Series)->pd.Series:
     """
     The model sometime give [high, 0] sequence due to so called numerical problem when water is too "enough".
-    However, the de-fluctuation "true" value may be interesting for decision alogrithom, 
+    However, the de-fluctuation "true" value may be interesting for decision algorithm, 
     thus this function try to give an approximation by smoothing like: 
 
     0.2, 0.3, 0.8, 0.0, 1.2, 0.0, ...
@@ -184,7 +185,7 @@ def stats_load(df, df_limit, wq_key, flow_keys, qctlo_key="qctlo", pump_key="pum
 
 def append_df(df_left, df_right):
     """
-    This function increase restarting error, as some info but not all can be given as exact value instead of interpoated value.
+    This function increase restarting error, as some info but not all can be given as exact value instead of interpolated value.
     But this function doesn't facilitate this info.
     """
     return df_left.append(df_right).resample("H").interpolate()
@@ -223,7 +224,7 @@ class Pedant:
         There're three kinds of df:
         * Given actioner only
         * Given actioner and out_map
-        * Given actioner, out_map and pedant has a non-trival postprocess
+        * Given actioner, out_map and pedant has a non-trivial postprocess
 
         Only The last one can be passed to get_load_df to get a valid load_df.
         """

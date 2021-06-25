@@ -94,7 +94,7 @@ class Runner:
     def cleanup(self):
         # user may want to keep those files
         rmtree(self.dst_root)
-        logging.info(f"cleanup {self.dst_root}")
+        logging.debug(f"cleanup {self.dst_root}")
 
     def check_shell_output(self, shell_output:str):
         # TODO: do some check to raise error as early as possible
@@ -208,7 +208,7 @@ def fork(runner_base: Runner, size:int) -> List[Runner]:
         copy_restart_files(runner_base.dst_root, runner.dst_root)
         runner_list.append(runner)
 
-        logging.info(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
+        logging.debug(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
     return runner_list
 
 def check_is_restarting(data_map_or_actioner):
@@ -219,6 +219,8 @@ def check_is_restarting(data_map_or_actioner):
 
 def restart_batch(runner_list:List[Runner], data_map_list, pool_size=None):
     # runner_list can be obtained by `debug_list` in `run_batch`
+    assert len(runner_list) == len(data_map_list)
+    
     for x in data_map_list:
         check_is_restarting(x)
     
@@ -240,14 +242,65 @@ def data_map_fill(data_map:dict):
     data_map_filled.update(data_map)
     return data_map_filled
 
+def restart_list_iterator(begin_day, end_day, runner_completed:Runner, actioner_frozen_list: List[Actioner],
+                        step=7, pedant: Pedant=None,
+                        debug_list=None, return_out_map=False):
+    # This function will not modify *qser* and other detailed information, 
+    # as they're expected to be encoded in actioner_frozen already.
+    # So this function will not yield actioner since the caller can still use action_frozen as usual.
+
+    actioner_list = [actioner.copy() for actioner in actioner_frozen_list]
+    processing_begin_day = begin_day
+
+    runner_list = fork(runner_completed, len(actioner_frozen_list))
+
+    if debug_list is not None:
+        debug_list.extend(runner_list)
+
+    for actioner in actioner_list:
+        actioner.enable_restart()
+
+    # TODO
+    while processing_begin_day < end_day:
+        simulation_length = min(end_day - processing_begin_day, step)
+
+        for actioner in actioner_list:
+            actioner.set_simulation_begin_time(processing_begin_day)
+            actioner.set_simulation_length(simulation_length)
+        
+        out_map_list = restart_batch(runner_list, actioner_list, pool_size=1)
+
+        for runner in runner_list:
+            copy_restart_files(runner.dst_root)
+
+        if return_out_map:
+            yield out_map_list
+        else:
+            df_list = [pedant.get_df(actioner, out_map) for out_map in out_map_list]
+            yield df_list
+
+        processing_begin_day = processing_begin_day + simulation_length
+
+    if debug_list is None:
+        for runner in runner_list:
+            runner.cleanup()
+
 def restart_iterator(begin_day, end_day, runner_completed: Runner, actioner_frozen:Runner, 
-                    step=7, dropna=True, pedant: Pedant=None,
+                    step=7, pedant: Pedant=None,
                     debug_list=None, return_out_map=False):
-    """
-    This function will not modify *qser* and other detailed information, 
-    as they're expected to be encoded in actioner_frozen already.
-    So this function will not yield actioner since the caller can still use action_frozen as usual.
-    """
+    # This function is for backward compatibility. Favor restart_list_iterator in general.
+    actioner_frozen_list = [actioner_frozen]
+    for df_or_out_map_list in restart_list_iterator(begin_day, end_day, runner_completed, actioner_frozen_list,
+                    step=step, pedant=pedant, debug_list=debug_list, return_out_map=return_out_map):
+        yield df_or_out_map_list[0]
+    
+"""
+def restart_iterator(begin_day, end_day, runner_completed: Runner, actioner_frozen:Runner, 
+                    step=7, pedant: Pedant=None,
+                    debug_list=None, return_out_map=False):
+    # This function will not modify *qser* and other detailed information, 
+    # as they're expected to be encoded in actioner_frozen already.
+    # So this function will not yield actioner since the caller can still use action_frozen as usual.
     
     actioner = actioner_frozen.copy()
     processing_begin_day = begin_day
@@ -268,6 +321,8 @@ def restart_iterator(begin_day, end_day, runner_completed: Runner, actioner_froz
         
         out_map, = restart_batch(runner_list, actioner_list, pool_size=1)
 
+        copy_restart_files(runner_list[0].dst_root)
+
         if return_out_map:
             yield out_map
         else:
@@ -279,9 +334,10 @@ def restart_iterator(begin_day, end_day, runner_completed: Runner, actioner_froz
     if debug_list is None:
         for runner in runner_list:
             runner.cleanup()
+"""
 
 def start_iterator(begin_day:int, end_day:int, root, actioner_frozen: Actioner,
-                    step=7, dropna=True, pedant:Pedant=None, return_out_map=False,
+                    step=7, pedant:Pedant=None, return_out_map=False,
                     debug_list=None, debug_restart_list=None):
                     
     actioner = actioner_frozen.copy()
@@ -300,7 +356,7 @@ def start_iterator(begin_day:int, end_day:int, root, actioner_frozen: Actioner,
         yield pedant.get_df(actioner, out_map)
 
     yield from restart_iterator(begin_day + step, end_day, runner_completed, actioner_frozen,
-                step=step, dropna=dropna, pedant=pedant,
+                step=step, pedant=pedant,
                 debug_list=debug_restart_list)
 
 @contextmanager

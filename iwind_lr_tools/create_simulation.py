@@ -1,5 +1,5 @@
 """
-This module provide both function which should be called from REPL and a CLI based on clize
+This module provide both function which should be called from REPL and a CLI based on `clize`
 """
 
 from .utils import copy_locked, symlink_locked
@@ -64,7 +64,7 @@ def create_simulation(origin_root:str, target_root:str, selected_name_list=None)
         # shutil.copy(src, dst)
         # copy_locked(dst, src)
 
-    logging.info(f"Base environment symbol link {target_root} -> {origin_root}")
+    logging.info(f"Base Env symbol link {target_root} -> {origin_root}")
     
 
 if __name__ == "__main__":
