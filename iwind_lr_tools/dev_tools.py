@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from copy import deepcopy
 import pickle
+import logging
 
 from iwind_lr_tools import create_simulation, run_simulation, dumps, Actioner, Runner, run_batch, restart_batch, \
     restart_iterator, start_iterator
@@ -24,6 +25,8 @@ from .runner import fork
 
 # from .extract_non_modified_files import extract_non_modified_files
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 interested_keys = ["ROP", "LOP", "LDP", "RDP", "PO4"]
 

@@ -11,6 +11,7 @@ import pandas as pd
 import os
 from contextlib import contextmanager
 from warnings import warn
+import logging
 
 from .fault_tolerant_pool import YPool as Pool
 from .io.common import Node, dumps
@@ -48,7 +49,7 @@ class Runner:
     Create a new environment, replace some *inp with the one proposed by optimizer and fetch result.
     """
 
-    def __init__(self, src_root, dst_root=None, without_create_simulation=False, verbose=True):
+    def __init__(self, src_root, dst_root=None, without_create_simulation=False):
         self.shell_output_list = []
         self.shell_output_parsed_list = []
 
@@ -63,8 +64,6 @@ class Runner:
 
             self.dst_root = Path(dst_root)
             create_simulation(src_root, dst_root)
-        
-        self.verbose = verbose
 
     def write(self, data_map:dict):
         # {"efdc.inp": efdc_node_list: List[Node], ....}
@@ -95,8 +94,7 @@ class Runner:
     def cleanup(self):
         # user may want to keep those files
         rmtree(self.dst_root)
-        if self.verbose:
-            print(f"cleanup {self.dst_root}")
+        logging.info(f"cleanup {self.dst_root}")
 
     def check_shell_output(self, shell_output:str):
         # TODO: do some check to raise error as early as possible
@@ -179,7 +177,7 @@ def work_restart(process_args: dict):
     return out
 
 
-def copy_restart_files(src, dst=None, verbose=True):
+def copy_restart_files(src, dst=None):
     src = Path(src)
     dst = Path(dst) if dst is not None else src
 
@@ -196,10 +194,10 @@ def copy_restart_files(src, dst=None, verbose=True):
             dst_p.unlink()
         copy_locked(src_p, dst_p)
         assert dst_p.exists(), "Strange bug?"
-        if verbose:
-            print("copied", src_p, "=>", dst_p)
 
-def fork(runner_base: Runner, size:int, verbose=True) -> List[Runner]:
+        logging.debug("copied", src_p, "=>", dst_p)
+
+def fork(runner_base: Runner, size:int) -> List[Runner]:
     """
     Fork a executed runner into many runners.
     """
@@ -209,8 +207,8 @@ def fork(runner_base: Runner, size:int, verbose=True) -> List[Runner]:
         runner = Runner(runner_base.dst_root)
         copy_restart_files(runner_base.dst_root, runner.dst_root)
         runner_list.append(runner)
-        if verbose:
-            print(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
+
+        logging.info(f"fork: {runner_base.dst_root} -> {runner.dst_root}")
     return runner_list
 
 def check_is_restarting(data_map_or_actioner):

@@ -16,6 +16,7 @@ from contextlib import contextmanager
 import shutil
 from typing import List
 import pandas as pd
+import logging
 
 from iwind_lr_tools import Actioner, Runner, run_batch, Runner, restart_batch, fork
 # import iwind_lr_tools
@@ -31,28 +32,27 @@ non_fast_mode = "WATER_STRICT" in os.environ
 
 """
 @contextmanager
-def create_environment_fast_only(ori_root, verbose=True):
+def create_environment_fast_only(ori_root):
     with TemporaryDirectory() as temp_path:
         root = Path(temp_path) / "root"
         shutil.copytree(ori_root, root)
         if not non_fast_mode:
             shutil.copy(efdc_fast, root / "efdc.inp")
-            if verbose:
-                print(f"Override {efdc_fast} -> {root / 'efdc.inp'}")
+            logging.info(f"Override {efdc_fast} -> {root / 'efdc.inp'}")
         yield root
 """
 
 # debug purpose
 @contextmanager
-def create_environment_fast_only(ori_root, verbose=True):
+def create_environment_fast_only(ori_root):
     temp_path = mkdtemp()
 
     root = Path(temp_path) / "root"
     shutil.copytree(ori_root, root)
     if not non_fast_mode:
         shutil.copy(efdc_fast, root / "efdc.inp")
-        if verbose:
-            print(f"Override {efdc_fast} -> {root / 'efdc.inp'}")
+        
+        logging.info(f"Override {efdc_fast} -> {root / 'efdc.inp'}")
     yield root
 
     # shutil.rmtree(temp_path)
