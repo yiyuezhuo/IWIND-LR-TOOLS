@@ -195,7 +195,7 @@ def copy_restart_files(src, dst=None):
         copy_locked(src_p, dst_p)
         assert dst_p.exists(), "Strange bug?"
 
-        logging.debug("copied", src_p, "=>", dst_p)
+        logging.debug(f"copied {src_p} => {dst_p}")
 
 def fork(runner_base: Runner, size:int) -> List[Runner]:
     """
@@ -220,7 +220,7 @@ def check_is_restarting(data_map_or_actioner):
 def restart_batch(runner_list:List[Runner], data_map_list, pool_size=None):
     # runner_list can be obtained by `debug_list` in `run_batch`
     assert len(runner_list) == len(data_map_list)
-    
+
     for x in data_map_list:
         check_is_restarting(x)
     
@@ -268,7 +268,7 @@ def restart_list_iterator(begin_day, end_day, runner_completed:Runner, actioner_
             actioner.set_simulation_begin_time(processing_begin_day)
             actioner.set_simulation_length(simulation_length)
         
-        out_map_list = restart_batch(runner_list, actioner_list, pool_size=1)
+        out_map_list = restart_batch(runner_list, actioner_list, pool_size=len(actioner_list))
 
         for runner in runner_list:
             copy_restart_files(runner.dst_root)
