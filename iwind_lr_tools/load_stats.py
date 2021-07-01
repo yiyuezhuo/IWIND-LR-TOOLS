@@ -196,11 +196,14 @@ class Pedant:
     A Pedant is a man who just want to attach everything with a timestamp.
 
     `postprocess` will add some specific data related columns to df which is used by `get_load_df`.
+
+    However, this object seems to play a clumsy role.
     """
     def __init__(self, dt: pd.Timestamp, *, wq_keys=None, aser_keys=None, smooth_wqpsc_inp=True, dropna=True,
                 postprocess=None,
-                df_limit=None, wq_key=None, flow_keys=None, qctlo_key="qctlo", pump_key="pump_outflow",
-                total_begin_time=None):
+                df_limit=None, wq_key=None, flow_keys=None, flow_fixed_keys=None, qctlo_key="qctlo", pump_key="pump_outflow",
+                total_begin_time=None,
+                dom_flow_key=None):
         self.dt = dt
 
         self.wq_keys = wq_keys
@@ -213,11 +216,13 @@ class Pedant:
         self.df_limit = df_limit
         self.wq_key = wq_key
         self.flow_keys= flow_keys
+        self.flow_fixed_keys = flow_fixed_keys if flow_fixed_keys is not None else []
 
         self.qctlo_key = qctlo_key
         self.pump_key = pump_key
 
         self.total_begin_time = int(total_begin_time) if total_begin_time is not None else None
+        self.dom_flow_key = dom_flow_key
 
     def get_df(self, actioner:Actioner, out_map=None):
         """
@@ -236,7 +241,7 @@ class Pedant:
 
     def get_df_load(self, df):
         assert self.get_load_df_ready()
-        return stats_load(df, self.df_limit, self.wq_key, self.flow_keys, 
+        return stats_load(df, self.df_limit, self.wq_key, self.flow_keys + self.flow_fixed_keys, 
             qctlo_key=self.qctlo_key, pump_key=self.pump_key)
 
     def get_load_df_ready(self):
@@ -251,3 +256,15 @@ class Pedant:
     def dt_to_hour(self, dt):
         offset = dt - self.dt - pd.DateOffset(days=self.total_begin_time)
         return offset.hours
+
+    @property
+    def wq_qctlo_key(self):
+        return f"{self.wq_key}_{self.qctlo_key}"
+
+    @property
+    def wq_dom_flow_key(self):
+        return f"{self.wq_key}_{self.dom_flow_key}"
+
+    @property
+    def flow_qctlo_key(self):
+        return f"flow_{self.qctlo_key}"
