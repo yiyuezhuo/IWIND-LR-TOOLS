@@ -12,6 +12,7 @@ import os
 from contextlib import contextmanager
 from warnings import warn
 import logging
+import numpy as np
 
 from .fault_tolerant_pool import YPool as Pool
 from .io.common import Node, dumps
@@ -383,3 +384,84 @@ def restart_single(begin_day, end_day, runner_completed, actioner_frozen:Actione
     step = end_day - begin_day
     it = restart_iterator(begin_day, end_day, runner_completed, actioner_frozen, step=step, **kwargs)
     return next(it)
+
+def restart_list_single(begin_day, end_day, runner_completed, actioner_frozen:Actioner, **kwargs):
+    step = end_day - begin_day
+    it = restart_list_iterator(begin_day, end_day, runner_completed, actioner_frozen, step=step, **kwargs)
+    return next(it)
+
+class SimilarRestarter:
+    def __init__(self, actioner_limit: Actioner, runner_completed, decided_length, end_hour, pedant, use_cache=True):
+        self.actioner_limit = actioner_limit
+        self.runner_completed = runner_completed
+        self.decided_length = decided_length
+        self.end_hour = end_hour
+        assert end_hour % 24 ==0
+
+        self.pedant = pedant
+
+        total_begin_time = self.actioner_limit.get_simulation_begin_time()
+
+        # whole begin_day, end_day
+        self.begin_day = total_begin_time + self.decided_length // 24
+        self.end_day = total_begin_time + end_hour // 24
+
+        self.use_cache = use_cache
+
+        self.decided_ddf_cached = None
+        self.same_end_day_cached = None
+        self.runner_guider_cached = None
+
+    def restart(self, decided_ddf_list):
+        assert len(decided_ddf_list) > 0
+
+        total_begin_time = self.actioner_limit.get_simulation_begin_time()
+
+        use_guider = True
+
+        if len(decided_ddf_list) == 1:
+            use_guider = False
+        else:
+            cut_ddf_arr = np.array([dddf[self.decided_length: self.end_hour].to_numpy() for dddf in decided_ddf_list]) # (num_simulation, time, inflow_and_pump)
+            same_arr = np.cumprod(np.all(cut_ddf_arr[0:1, :, :] == cut_ddf_arr[1:, :, :], axis=(0, 2)))
+            if same_arr[0] == 0:
+                use_guider = False
+            else:
+                same_idx = np.where(same_arr == 1)[0][0]
+                same_end_day = total_begin_time + (self.decided_length + same_idx) // 24
+                if same_end_day == self.begin_day:
+                    use_guider = False
+
+        if not use_guider:
+            actioner_list = []
+            for decided_ddf in decided_ddf_list:
+                actioner = self.actioner_limit.copy()
+                actioner.set_flow_by_decision_df(decided_ddf)
+                actioner_list.append(actioner)
+            return restart_list_single(self.begin_day, self.end_day, self.runner_completed, actioner_list, pedant=self.pedant)
+    
+        if self.use_cache and self.same_idx_cached is not None and self.same_end_day_cached <= same_end_day:
+            same_end_hour = (self.same_end_day_cached - total_begin_time)*24
+            ref_arr = self.decided_ddf_cached[self.decided_length: same_end_hour].to_numpy()[np.newaxis, ...]
+            
+            cut_ddf_arr[:same_end_hour]
+
+        actioner_guider = self.actioner_limit.copy()
+        actioner_guider.set_flow_by_decision_df(decided_ddf_list[0])
+        
+        debug_list = []
+        df_guider = restart_single(begin_day, end_day, self.runner_completed, actioner_guider,
+            debug_list=debug_list, pedant=self.pedant,
+        )
+        runner_guider = debug_list[0]
+
+        # TODO: WIP
+
+
+
+
+
+
+
+
+

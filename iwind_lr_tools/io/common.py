@@ -108,6 +108,7 @@ class DataFrameNode(AbstractDataFrameNode):
         return self.obj
 
     def set_df(self, df):
+        # self.obj[:] = df
         self.obj = df
 
     def set_name(self, name:str):
@@ -124,8 +125,8 @@ class FlowNode(AbstractDataFrameNode): # qser main data
         self.depth_line = lines[1].strip()
         assert int(self.depth_line.strip()) == 1, f"This version assume target has only 1 depth, but found {self.depth_line}"
         
-        self.table_data = lines[2:]
-        buf = StringIO('\n'.join(self.table_data))
+        table_data = lines[2:]
+        buf = StringIO('\n'.join(table_data))
         self.df = pd.read_csv(buf, header=None, names=["time", "flow"], delim_whitespace=True)
         
         self.length = len(lines) - 2
@@ -168,9 +169,9 @@ class ConcentrationNode(AbstractDataFrameNode):
         self.spec = lines[0].strip().split()
         assert len(self.spec) == 7, f"wrong concentration spec, {self.spec}"
 
-        self.table_data = lines[1:]
+        table_data = lines[1:]
 
-        buf = StringIO('\n'.join(self.table_data))
+        buf = StringIO('\n'.join(table_data))
         self.df = pd.read_csv(buf, header=None, names=names, delim_whitespace=True)
         
         self.length = len(lines) - 1
@@ -201,8 +202,8 @@ class FlowAdjustMatrixNode(Node):
         assert time_line[0].isdigit()
         self.time = time_line[0] # float(time_line[0])
         
-        self.table_data = lines[1:]
-        buf = StringIO('\n'.join(self.table_data))
+        table_data = lines[1:]
+        buf = StringIO('\n'.join(table_data))
         self.df = pd.read_csv(buf, header=None, names=names, delim_whitespace=True)
         self.obj = (self.time, self.df)
 
@@ -220,6 +221,7 @@ class FlowAdjustMatrixNode(Node):
 
     def set_df(self, df):
         self.df = df
+        #self.df[:] = df
 
 
 def dumps(node_list: List[Node]):

@@ -6,7 +6,7 @@ from warnings import warn
 from copy import deepcopy
 from collections.abc import Iterable
 
-from .collector import inp_out_map, get_df_node_map_map_and_df_map_map
+from .collector import inp_out_map, get_df_node_map_map_and_df_map_map, dumpable_list
 from .io import qser_inp
 from .io.common import ConcentrationNode, Node, FlowNode, CommentNode, FlowAdjustMatrixNode
 
@@ -40,7 +40,8 @@ class Actioner:
         C03 = self.df_map_map["efdc.inp"]["C03"]
         return C03.loc[0, "TBEGIN"]
 
-    def sync_from_data_map(self):
+    def _sync_from_data_map(self):
+        # Now we recommend df[:] = df2 to sync automatically.
         _df_node_map_map, _df_map_map = get_df_node_map_map_and_df_map_map(self.data_map)
         self.df_node_map_map.clear()
         self.df_node_map_map.update(_df_node_map_map)
@@ -119,7 +120,7 @@ class Actioner:
                 df = df.iloc[idx_list_wq]
                 node.set_df(df)
 
-        self.sync_from_data_map()
+        self._sync_from_data_map()
 
     def select_flow_soft(self, idx_list: List[int]):
         """
@@ -157,7 +158,7 @@ class Actioner:
         
         self.df_node_map_map["wq3dwc.inp"]["C34_2"].set_df(C34_2_selected)
 
-        self.sync_from_data_map()
+        self._sync_from_data_map()
 
     def select_flow_flow0(self, idx_list: List[int]):
         drop_idx_list = self.get_flow_comp(idx_list)
@@ -219,13 +220,19 @@ class Actioner:
         return (self.data_map, self.df_node_map_map, self.df_map_map)
 
     def copy(self):
-        # TODO: find a way to speed it up while still be correct.
-        return deepcopy(self)
         """
-        actioner = Actioner(deepcopy(self.data_map), {}, {})
-        actioner.sync_from_data_map()
+        `copy` will copy only "dumpable" data in data_map.
+        To copy everything, use `deepcopy` method.
+        """
+        data_map = self.data_map.copy()
+        actioner = Actioner(data_map, {}, {})
+        for key in dumpable_list:
+            actioner.data_map[key] = deepcopy(self.data_map[key])
+        actioner._sync_from_data_map()
         return actioner
-        """
+
+    def deepcopy(self):
+        return deepcopy(self)
 
     def _get_df_index(self, flow_key, time_begin, time_end):
         df = self.df_map_map["qser.inp"][flow_key]
@@ -296,4 +303,5 @@ class Actioner:
         self.set_simulation_length(end_day - begin_day)
         self.set_flow_by_decision_df(ddf)
 
-
+    def set_flow_df_direct(self, flow_key, df):
+        self.df_map_map["qser.inp"][flow_key][:] = df

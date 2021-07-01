@@ -6,9 +6,22 @@ from warnings import warn
 from .actioner import Actioner
 
 
-def get_time_indexed_df(df:pd.DataFrame, time_key:str, dt:pd.Timestamp):
-    df = df.set_index(dt + pd.TimedeltaIndex(df[time_key], unit="D")).resample("H").nearest()
-    df.index = df.index.rename("date")
+def get_time_indexed_df(df:pd.DataFrame, time_key:str, dt:pd.Timestamp, pair=False):
+    """
+    `Pair` is like:
+
+    1614.000000 	0.01869159
+    1614.041667 	0.01869159
+    1614.041667 	0.01868327
+    1614.083333 	0.01868327
+    """
+    index = dt + pd.TimedeltaIndex(df[time_key], unit="D")
+    if pair:
+        index_arr = index.to_numpy() # np.ndarray with dtype datetime64[ns]
+        index_arr[1::2] = index_arr[1::2] - 1 # -1 nanosecond
+        index = pd.DatetimeIndex(index_arr)
+    df = df.set_index(index).resample("H").nearest()
+    df.index = df.index.rename("date").to_period()
     return df
 
 def get_time_aligned_map(data_map, df_node_map_map, df_map_map, out_map=None, dt:pd.Timestamp=None):
@@ -41,12 +54,14 @@ def get_time_aligned_map(data_map, df_node_map_map, df_map_map, out_map=None, dt
     
     wqpsc_inp = {}
     for flow_name, df in df_map_map["wqpsc.inp"].items():
-        wqpsc_inp[flow_name] = get_time_indexed_df(df.iloc[::2], "TIME", dt)
+        # wqpsc_inp[flow_name] = get_time_indexed_df(df.iloc[::2], "TIME", dt)
+        wqpsc_inp[flow_name] = get_time_indexed_df(df, "TIME", dt, pair=True)
     rd["wqpsc.inp"] = wqpsc_inp
     
     qser_inp = {}
     for flow_name, df in df_map_map["qser.inp"].items():
-        qser_inp[flow_name] = get_time_indexed_df(df.iloc[::2], "time", dt)
+        # qser_inp[flow_name] = get_time_indexed_df(df.iloc[::2], "time", dt)
+        qser_inp[flow_name] = get_time_indexed_df(df, "time", dt, pair=True)
     rd["qser.inp"] = qser_inp
 
     return rd
@@ -198,12 +213,15 @@ class Pedant:
     `postprocess` will add some specific data related columns to df which is used by `get_load_df`.
 
     However, this object seems to play a clumsy role.
+
+    flow_keys: keys of "controlled" flows.
+    flow_fixed_keys: keys of "uncontrolled" flows, which will also be accounted in load.
     """
     def __init__(self, dt: pd.Timestamp, *, wq_keys=None, aser_keys=None, smooth_wqpsc_inp=True, dropna=True,
                 postprocess=None,
                 df_limit=None, wq_key=None, flow_keys=None, flow_fixed_keys=None, qctlo_key="qctlo", pump_key="pump_outflow",
                 total_begin_time=None,
-                dom_flow_key=None):
+                ): #dom_flow_key=None):
         self.dt = dt
 
         self.wq_keys = wq_keys
@@ -222,7 +240,7 @@ class Pedant:
         self.pump_key = pump_key
 
         self.total_begin_time = int(total_begin_time) if total_begin_time is not None else None
-        self.dom_flow_key = dom_flow_key
+        # self.dom_flow_key = dom_flow_key
 
     def get_df(self, actioner:Actioner, out_map=None):
         """
@@ -260,11 +278,41 @@ class Pedant:
     @property
     def wq_qctlo_key(self):
         return f"{self.wq_key}_{self.qctlo_key}"
-
+    
+    """
     @property
     def wq_dom_flow_key(self):
         return f"{self.wq_key}_{self.dom_flow_key}"
+    """
 
     @property
     def flow_qctlo_key(self):
         return f"flow_{self.qctlo_key}"
+
+    @property
+    def wq_flow_keys(self):
+        for flow_key in self.flow_keys:
+            yield f"{self.wq_key}_{flow_key}"
+
+    def flow_series_to_actioner_flow_df(self, ser: pd.Series):
+        
+        assert isinstance(ser, pd.Series) and isinstance(ser.index, pd.PeriodIndex)
+
+        di_start = ser.index.to_timestamp(how="start")
+        di_end = ser.index.to_timestamp(how="end")
+
+        ser_start = pd.Series(ser.to_numpy(), index=di_start)
+        ser_end = pd.Series(ser.to_numpy(), index=di_end)
+
+        ser2 = ser_start.append(ser_end)
+        ser3 = ser2.sort_index() # TODO: find a way to "mix" two array cheaply
+
+        df = pd.DataFrame(dict(time=(ser3.index - self.dt) / pd.Timedelta(days=1), flow=ser3.to_numpy() / 3600))
+
+        return df
+
+    def apply_df_to_actioner(self, actioner: Actioner, df):
+        for flow_key in self.flow_keys:
+            flow_df = self.flow_series_to_actioner_flow_df(df[f"flow_{flow_key}"])
+            actioner.set_flow_df_direct(flow_key, flow_df)
+
